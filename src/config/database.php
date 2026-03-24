@@ -1,20 +1,13 @@
 <?php
-/**
- * Ligação à base de dados.
- * Na Vercel: usa as Variáveis de Ambiente (getenv).
- * Em local (XAMPP): usa o fallback para 'localhost' ou o ficheiro database.local.php.
- */
-
-// Puxa as variáveis da Vercel. Se não existirem (no teu PC local), usa os valores por defeito do XAMPP.
 $databaseConfig = [
-    'host'     => getenv('DB_HOST') ?: 'localhost',
-    'db_name'  => getenv('DB_NAME') ?: 'sweet_cakes',
-    'username' => getenv('DB_USER') ?: 'root',
-    'password' => getenv('DB_PASSWORD') ?: '',
-    'port'     => getenv('DB_PORT') ?: '3306'
+    // Atualizado para ler as variáveis da Vercel de forma mais segura
+    'host'     => $_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost',
+    'db_name'  => $_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: 'sweet_cakes',
+    'username' => $_ENV['DB_USER'] ?? getenv('DB_USER') ?: 'root',
+    'password' => $_ENV['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?: '',
+    'port'     => $_ENV['DB_PORT'] ?? getenv('DB_PORT') ?: '3306'
 ];
 
-// A tua lógica do ficheiro local (muito bem pensada, mantivemos intacta!)
 $localFile = __DIR__ . '/database.local.php';
 if (file_exists($localFile)) {
     $local = require $localFile;
@@ -43,15 +36,21 @@ class Database {
     public function getConnection() {
         $this->conn = null;
         try {
-            // CORREÇÃO CRÍTICA: Adicionada a porta "port={$this->port}" na string do PDO!
+            $options = [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ];
+            
             $this->conn = new PDO(
                 "mysql:host={$this->host};port={$this->port};dbname={$this->db_name};charset=utf8mb4",
                 $this->username,
-                $this->password
+                $this->password,
+                $options
             );
-            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch(PDOException $exception) {
-            echo "Erro na conexão: " . $exception->getMessage();
+            // ISTO É A MAGIA: Envia o erro real para os Logs da Vercel para não termos de adivinhar!
+            error_log("ERRO CRÍTICO NA BASE DE DADOS (AIVEN): " . $exception->getMessage());
+            error_log("Tentou conectar a: {$this->host} na porta {$this->port} com user {$this->username}");
         }
         return $this->conn;
     }
