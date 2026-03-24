@@ -20,10 +20,10 @@ class UtilizadorController
         $this->funcionario = new Funcionario($db);
     }
 
-    private function jsonSessionPayload(array $user, array $pessoa, ?array $func): array
+    private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
     {
         return [
-            'session_id' => session_id(),
+            'session_id' => $sessionToken,
             'utilizador' => [
                 'utilizador_id' => $user['utilizador_id'],
                 'pessoa_id' => $pessoa['pessoa_id'],
@@ -219,11 +219,12 @@ class UtilizadorController
         $func = $stmt->fetch(PDO::FETCH_ASSOC);
 
         Auth::loginFromUserRow($user, $pessoa, $func ?: null);
+        $sessionToken = Auth::issueSessionToken($user, $pessoa, $func ?: null);
 
         echo json_encode(array_merge([
             'success' => true,
             'message' => 'Login efetuado com sucesso',
-        ], $this->jsonSessionPayload($user, $pessoa, $func ?: null)));
+        ], $this->jsonSessionPayload($user, $pessoa, $func ?: null, $sessionToken)));
     }
 
     public function adminLogin($data)
@@ -298,10 +299,11 @@ class UtilizadorController
         }
 
         Auth::loginFromUserRow($user, $pessoa, $func);
+        $sessionToken = Auth::issueSessionToken($user, $pessoa, $func);
 
         echo json_encode(array_merge([
             'success' => true,
             'message' => 'Login efetuado com sucesso',
-        ], $this->jsonSessionPayload($user, $pessoa, $func)));
+        ], $this->jsonSessionPayload($user, $pessoa, $func, $sessionToken)));
     }
 }

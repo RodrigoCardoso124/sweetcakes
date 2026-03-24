@@ -3,6 +3,7 @@
 class Auth
 {
     private static ?array $appConfig = null;
+    private const TOKEN_TTL_SECONDS = 604800; // 7 dias
 
     public static function setConfig(array $config): void
     {
@@ -12,6 +13,93 @@ class Auth
     private static function cfg(string $key, $default = null)
     {
         return self::$appConfig[$key] ?? $default;
+    }
+
+    private static function b64urlEncode(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    private static function b64urlDecode(string $data): ?string
+    {
+        $pad = strlen($data) % 4;
+        if ($pad > 0) {
+            $data .= str_repeat('=', 4 - $pad);
+        }
+        $decoded = base64_decode(strtr($data, '-_', '+/'), true);
+        return $decoded === false ? null : $decoded;
+    }
+
+    private static function tokenSecret(): string
+    {
+        $envSecret = getenv('APP_KEY');
+        if (is_string($envSecret) && trim($envSecret) !== '') {
+            return $envSecret;
+        }
+        return (string) self::cfg('app_key', 'sweetcakes-dev-change-app-key');
+    }
+
+    private static function buildSignedToken(array $payload): string
+    {
+        $json = json_encode($payload);
+        $body = self::b64urlEncode($json === false ? '{}' : $json);
+        $sig = hash_hmac('sha256', $body, self::tokenSecret(), true);
+        return $body . '.' . self::b64urlEncode($sig);
+    }
+
+    private static function parseSignedToken(string $token): ?array
+    {
+        if (!preg_match('/^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/', $token)) {
+            return null;
+        }
+        [$body, $sig] = explode('.', $token, 2);
+        $expected = self::b64urlEncode(hash_hmac('sha256', $body, self::tokenSecret(), true));
+        if (!hash_equals($expected, $sig)) {
+            return null;
+        }
+        $json = self::b64urlDecode($body);
+        if ($json === null) {
+            return null;
+        }
+        $payload = json_decode($json, true);
+        if (!is_array($payload)) {
+            return null;
+        }
+        if (!isset($payload['exp']) || (int) $payload['exp'] < time()) {
+            return null;
+        }
+        return $payload;
+    }
+
+    private static function getHeaderSessionToken(): ?string
+    {
+        $sid = $_SERVER['HTTP_X_SESSION_ID'] ?? '';
+        if (!is_string($sid) || trim($sid) === '') {
+            return null;
+        }
+        return trim($sid);
+    }
+
+    private static function hydrateSessionFromTokenPayload(array $payload): void
+    {
+        $_SESSION['utilizador_id'] = isset($payload['uid']) ? (int) $payload['uid'] : null;
+        $_SESSION['pessoa_id'] = isset($payload['pid']) ? (int) $payload['pid'] : null;
+        $_SESSION['is_admin'] = !empty($payload['adm']);
+        $_SESSION['funcionario_id'] = isset($payload['fid']) && $payload['fid'] !== null ? (int) $payload['fid'] : null;
+    }
+
+    private static function tryAuthenticateFromToken(): bool
+    {
+        $token = self::getHeaderSessionToken();
+        if ($token === null) {
+            return false;
+        }
+        $payload = self::parseSignedToken($token);
+        if ($payload === null) {
+            return false;
+        }
+        self::hydrateSessionFromTokenPayload($payload);
+        return true;
     }
 
     /**
@@ -72,12 +160,21 @@ class Auth
     public static function isLoggedIn(): bool
     {
         self::startSession();
-        return !empty($_SESSION['pessoa_id']) && !empty($_SESSION['utilizador_id']);
+        if (!empty($_SESSION['pessoa_id']) && !empty($_SESSION['utilizador_id'])) {
+            return true;
+        }
+        return self::tryAuthenticateFromToken();
     }
 
     public static function isAdmin(): bool
     {
         self::startSession();
+        if (!empty($_SESSION['is_admin']) && !empty($_SESSION['funcionario_id'])) {
+            return true;
+        }
+        if (!self::tryAuthenticateFromToken()) {
+            return false;
+        }
         return !empty($_SESSION['is_admin']) && !empty($_SESSION['funcionario_id']);
     }
 
@@ -110,6 +207,23 @@ class Auth
         $_SESSION['pessoa_id'] = (int) $pessoaRow['pessoa_id'];
         $_SESSION['is_admin'] = (bool) $funcionarioRow;
         $_SESSION['funcionario_id'] = $funcionarioRow ? (int) $funcionarioRow['funcionario_id'] : null;
+    }
+
+    public static function issueSessionToken(
+        array $userRow,
+        array $pessoaRow,
+        ?array $funcionarioRow
+    ): string {
+        $now = time();
+        $payload = [
+            'uid' => (int) ($userRow['utilizador_id'] ?? 0),
+            'pid' => (int) ($pessoaRow['pessoa_id'] ?? 0),
+            'fid' => $funcionarioRow ? (int) ($funcionarioRow['funcionario_id'] ?? 0) : null,
+            'adm' => (bool) $funcionarioRow,
+            'iat' => $now,
+            'exp' => $now + self::TOKEN_TTL_SECONDS,
+        ];
+        return self::buildSignedToken($payload);
     }
 
     public static function destroySession(): void
