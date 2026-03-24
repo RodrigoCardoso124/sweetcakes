@@ -1,23 +1,20 @@
 <?php
 /**
  * Ligação à base de dados.
- * Em local (XAMPP): usa os valores por defeito abaixo.
- * No servidor: cria o ficheiro database.local.php nesta pasta com:
- *   return [
- *     'host'     => 'nome_do_servidor_mysql',
- *     'db_name'  => 'nome_da_base_dados',
- *     'username' => 'utilizador',
- *     'password' => 'password',
- *   ];
- * Não faças commit do database.local.php (está no .gitignore).
+ * Na Vercel: usa as Variáveis de Ambiente (getenv).
+ * Em local (XAMPP): usa o fallback para 'localhost' ou o ficheiro database.local.php.
  */
+
+// Puxa as variáveis da Vercel. Se não existirem (no teu PC local), usa os valores por defeito do XAMPP.
 $databaseConfig = [
-    'host'     => 'localhost',
-    'db_name'  => 'sweet_cakes',
-    'username' => 'root',
-    'password' => '',
+    'host'     => getenv('DB_HOST') ?: 'localhost',
+    'db_name'  => getenv('DB_NAME') ?: 'sweet_cakes',
+    'username' => getenv('DB_USER') ?: 'root',
+    'password' => getenv('DB_PASSWORD') ?: '',
+    'port'     => getenv('DB_PORT') ?: '3306'
 ];
 
+// A tua lógica do ficheiro local (muito bem pensada, mantivemos intacta!)
 $localFile = __DIR__ . '/database.local.php';
 if (file_exists($localFile)) {
     $local = require $localFile;
@@ -29,20 +26,26 @@ class Database {
     private $db_name;
     private $username;
     private $password;
+    private $port;
     public $conn;
 
     public function __construct(array $config = []) {
-        $this->host     = $config['host'] ?? 'localhost';
-        $this->db_name  = $config['db_name'] ?? 'sweet_cakes';
-        $this->username = $config['username'] ?? 'root';
-        $this->password = $config['password'] ?? '';
+        global $databaseConfig;
+        $cfg = !empty($config) ? $config : $databaseConfig;
+
+        $this->host     = $cfg['host'];
+        $this->db_name  = $cfg['db_name'];
+        $this->username = $cfg['username'];
+        $this->password = $cfg['password'];
+        $this->port     = $cfg['port'];
     }
 
     public function getConnection() {
         $this->conn = null;
         try {
+            // CORREÇÃO CRÍTICA: Adicionada a porta "port={$this->port}" na string do PDO!
             $this->conn = new PDO(
-                "mysql:host={$this->host};dbname={$this->db_name};charset=utf8mb4",
+                "mysql:host={$this->host};port={$this->port};dbname={$this->db_name};charset=utf8mb4",
                 $this->username,
                 $this->password
             );
@@ -53,4 +56,3 @@ class Database {
         return $this->conn;
     }
 }
-

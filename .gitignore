@@ -1,18 +1,20 @@
-src/config/app_config.local.php
-src/config/mail_config.local.php
-src/config/database.local.php
+# 1. Credenciais e Variáveis de Ambiente (NUNCA enviar para o GitHub)
+.env
+.env.*
+database.local.php
+*.local.php
 
-var/*
-!var/.gitkeep
+# 2. Pastas ocultas da Vercel
+.vercel/
 
+# 3. Configurações do teu VS Code ou outros editores
+.vscode/
+.idea/
 
-*local.php
-src/config/database.local.php
-src/config/stripe_config.local.php
-src/config/app_config.local.php
-src/config/mail_config.local.php
-
-# Ignorar logs e backups de banco
+# 4. Logs e ficheiros de sistema (Mac/Windows)
 *.log
-var/
-sql/*.sql
+.DS_Store
+Thumbs.db
+
+# 5. Dependências (se chegares a usar o Composer no PHP)
+vendor/
