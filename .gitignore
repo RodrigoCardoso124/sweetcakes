@@ -1,0 +1,18 @@
+src/config/app_config.local.php
+src/config/mail_config.local.php
+src/config/database.local.php
+
+var/*
+!var/.gitkeep
+
+
+*local.php
+src/config/database.local.php
+src/config/stripe_config.local.php
+src/config/app_config.local.php
+src/config/mail_config.local.php
+
+# Ignorar logs e backups de banco
+*.log
+var/
+sql/*.sql

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estatísticas - Sweet Cakes</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="admin-sidebar">
+            <div class="sidebar-header">
+                <h1>🍰 Sweet Cakes</h1>
+                <p>Painel Administrativo</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📦</span>
+                    <span>Encomendas</span>
+                </a>
+                <a href="clientes.html" class="nav-item">
+                    <span class="icon">👥</span>
+                    <span>Clientes</span>
+                </a>
+                <a href="produtos.html" class="nav-item">
+                    <span class="icon">🍰</span>
+                    <span>Produtos</span>
+                </a>
+                <a href="funcionarios.html" class="nav-item">
+                    <span class="icon">👔</span>
+                    <span>Funcionários</span>
+                </a>
+                <a href="estatisticas.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Estatísticas</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">Sair</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h2>Estatísticas e Relatórios</h2>
+                <div class="header-actions">
+                    <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
+                </div>
+            </header>
+
+            <!-- Main Stats -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+                <div class="stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div class="stat-info">
+                        <h3 id="totalEncomendas">0</h3>
+                        <p>Total Encomendas</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-info">
+                        <h3 id="totalVendas">€0.00</h3>
+                        <p>Total Vendas</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-info">
+                        <h3 id="totalClientes">0</h3>
+                        <p>Total Clientes</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🍰</div>
+                    <div class="stat-info">
+                        <h3 id="totalProdutos">0</h3>
+                        <p>Total Produtos</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Encomendas Stats -->
+            <div class="detail-card">
+                <h3>Estatísticas de Encomendas</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">⏳</div>
+                        <div class="stat-info">
+                            <h3 id="encomendasPendentes">0</h3>
+                            <p>Pendentes</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <h3 id="encomendasAceites">0</h3>
+                            <p>Aceites</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">👨‍🍳</div>
+                        <div class="stat-info">
+                            <h3 id="encomendasPreparacao">0</h3>
+                            <p>Em Preparação</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-info">
+                            <h3 id="encomendasProntas">0</h3>
+                            <p>Prontas</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✓</div>
+                        <div class="stat-info">
+                            <h3 id="encomendasEntregues">0</h3>
+                            <p>Entregues</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-info">
+                            <h3 id="encomendasCanceladas">0</h3>
+                            <p>Canceladas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Produtos Stats -->
+            <div class="detail-card">
+                <h3>Estatísticas de Produtos</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-info">
+                            <h3 id="produtosDisponiveis">0</h3>
+                            <p>Disponíveis</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">❌</div>
+                        <div class="stat-info">
+                            <h3 id="produtosIndisponiveis">0</h3>
+                            <p>Indisponíveis</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="admin-common.js"></script>
+    <script src="estatisticas.js?v=20260323"></script>
+</body>
+</html>
+

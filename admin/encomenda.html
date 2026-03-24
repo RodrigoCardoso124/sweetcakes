@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes da Encomenda - Sweet Cakes</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="admin-sidebar">
+            <div class="sidebar-header">
+                <h1>🍰 Sweet Cakes</h1>
+                <p>Painel Administrativo</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📦</span>
+                    <span>Encomendas</span>
+                </a>
+                <a href="clientes.html" class="nav-item">
+                    <span class="icon">👥</span>
+                    <span>Clientes</span>
+                </a>
+                <a href="produtos.html" class="nav-item">
+                    <span class="icon">🍰</span>
+                    <span>Produtos</span>
+                </a>
+                <a href="funcionarios.html" class="nav-item">
+                    <span class="icon">👔</span>
+                    <span>Funcionários</span>
+                </a>
+                <a href="estatisticas.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Estatísticas</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">Sair</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;flex:1;">
+                    <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
+                    <a href="index.html" class="back-btn">← Voltar</a>
+                    <h2>Detalhes da Encomenda #<span id="orderId"></span></h2>
+                </div>
+            </header>
+
+            <div id="loading" class="loading-container">
+                <div class="spinner"></div>
+                <p>Carregando detalhes...</p>
+            </div>
+
+            <div id="orderDetails" style="display: none;">
+                <!-- Order Info Card -->
+                <div class="detail-card">
+                    <h3>Informações da Encomenda</h3>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <label>Estado:</label>
+                            <span id="orderStatus" class="status-badge"></span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Total:</label>
+                            <span id="orderTotal" class="price"></span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Cliente ID:</label>
+                            <span id="orderClientId"></span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Funcionário ID:</label>
+                            <span id="orderEmployeeId"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Client Info Card -->
+                <div class="detail-card" id="clientCard">
+                    <h3>Informações do Cliente</h3>
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <label>Nome:</label>
+                            <span id="clientName"></span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Email:</label>
+                            <span id="clientEmail"></span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Telemóvel:</label>
+                            <span id="clientPhone"></span>
+                        </div>
+                        <div class="detail-item">
+                            <label>Morada:</label>
+                            <span id="clientAddress"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Products List -->
+                <div class="detail-card">
+                    <h3>Produtos da Encomenda</h3>
+                    <div id="productsList" class="products-list"></div>
+                </div>
+
+                <!-- Actions -->
+                <div class="actions-card">
+                    <h3>Alterar Estado</h3>
+                    <div class="status-actions">
+                        <select id="statusSelect" class="form-select">
+                            <option value="pendente">Pendente</option>
+                            <option value="aceite">Aceite</option>
+                            <option value="em_preparacao">Em Preparação</option>
+                            <option value="pronta">Pronta</option>
+                            <option value="entregue">Entregue</option>
+                            <option value="cancelada">Cancelada</option>
+                        </select>
+                        <button id="updateStatusBtn" class="btn btn-primary">Atualizar Estado</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="error-container" style="display: none;">
+                <p>Erro ao carregar encomenda. <a href="index.html">Voltar à lista</a></p>
+            </div>
+        </main>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="admin-common.js"></script>
+    <script src="encomenda-detail.js"></script>
+</body>
+</html>
+

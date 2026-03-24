@@ -1,0 +1,9 @@
+# Sweet Cakes — compatível com proxies (ex.: InfinityFree atrás de HTTPS)
+<IfModule mod_setenvif.c>
+    SetEnvIf X-Forwarded-Proto "https" HTTPS=on
+</IfModule>
+
+# Opcional: se o servidor permitir, ajuda o PHP a ver rotas index.php/recurso
+<IfModule mod_negotiation.c>
+    Options -MultiViews
+</IfModule>

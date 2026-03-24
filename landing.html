@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sweet Cakes</title>
+    <style>
+        :root {
+            --c1: #d4a574;
+            --c2: #8b6f47;
+            --bg: #faf8f5;
+            --card: #fff;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: #333;
+            line-height: 1.6;
+        }
+        .hero {
+            background: linear-gradient(135deg, var(--c1) 0%, var(--c2) 100%);
+            color: #fff;
+            padding: 48px 24px 64px;
+            text-align: center;
+        }
+        .hero h1 { margin: 0 0 12px; font-size: clamp(1.75rem, 4vw, 2.5rem); }
+        .hero p { margin: 0 auto; max-width: 520px; opacity: 0.95; }
+        .actions {
+            margin-top: 28px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary {
+            background: #fff;
+            color: var(--c2);
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+        .btn-primary:hover { transform: translateY(-2px); }
+        .btn-ghost {
+            border: 2px solid rgba(255,255,255,0.8);
+            color: #fff;
+        }
+        .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+        main { max-width: 960px; margin: -32px auto 48px; padding: 0 20px; }
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+        }
+        .card h2 { margin-top: 0; color: var(--c2); font-size: 1.35rem; }
+        .grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        }
+        .product {
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 16px;
+            background: #fff;
+        }
+        .product h3 { margin: 0 0 8px; font-size: 1rem; color: #333; }
+        .product .price { color: var(--c1); font-weight: 700; font-size: 1.1rem; }
+        .muted { color: #666; font-size: 14px; }
+        footer { text-align: center; padding: 24px; color: #888; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <header class="hero">
+        <h1>Sweet Cakes</h1>
+        <p>Bolos e doces artesanais. Encomenda pela app ou contacta-nos.</p>
+        <div class="actions">
+            <a class="btn btn-primary" href="admin/login.html">Área administrativa</a>
+            <a class="btn btn-ghost" href="#catalogo">Ver catálogo</a>
+        </div>
+    </header>
+    <main>
+        <section class="card" id="catalogo">
+            <h2>Catálogo (amostra)</h2>
+            <p class="muted">Produtos disponíveis via API pública. Preços e stock podem variar.</p>
+            <div id="produtosGrid" class="grid" style="margin-top:20px;">
+                <p class="muted">A carregar…</p>
+            </div>
+        </section>
+    </main>
+    <footer>Sweet Cakes · Painel interno reservado a funcionários</footer>
+    <script>
+    (function () {
+        var path = window.location.pathname || '';
+        var base = path.replace(/\/[^/]*$/, '');
+        if (!base || base === path) base = '';
+        var api = window.location.origin + base + '/index.php/produtos';
+        var grid = document.getElementById('produtosGrid');
+        fetch(api, { credentials: 'omit' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!Array.isArray(data) || !data.length) {
+                    grid.innerHTML = '<p class="muted">Sem produtos para mostrar.</p>';
+                    return;
+                }
+                var imgBase = window.location.origin + base + '/image.php?path=';
+                grid.innerHTML = data.slice(0, 12).map(function (p) {
+                    var img = p.imagem ? '<img src="' + imgBase + encodeURIComponent(p.imagem) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;">' : '';
+                    var disp = p.disponivel == 1 ? '' : '<span class="muted"> (indisponível)</span>';
+                    return '<div class="product">' + img + '<h3>' + (p.nome || 'Produto') + disp + '</h3><p class="muted" style="margin:0 0 8px;font-size:13px;">' + (p.descricao || '').substring(0, 80) + '</p><div class="price">€' + parseFloat(p.preco || 0).toFixed(2) + '</div></div>';
+                }).join('');
+            })
+            .catch(function () {
+                grid.innerHTML = '<p class="muted">Não foi possível carregar o catálogo. Confirma que a API está acessível.</p>';
+            });
+    })();
+    </script>
+</body>
+</html>

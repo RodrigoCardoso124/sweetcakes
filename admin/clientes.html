@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Clientes - Sweet Cakes</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="admin-sidebar">
+            <div class="sidebar-header">
+                <h1>🍰 Sweet Cakes</h1>
+                <p>Painel Administrativo</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📦</span>
+                    <span>Encomendas</span>
+                </a>
+                <a href="clientes.html" class="nav-item">
+                    <span class="icon">👥</span>
+                    <span>Clientes</span>
+                </a>
+                <a href="produtos.html" class="nav-item">
+                    <span class="icon">🍰</span>
+                    <span>Produtos</span>
+                </a>
+                <a href="funcionarios.html" class="nav-item">
+                    <span class="icon">👔</span>
+                    <span>Funcionários</span>
+                </a>
+                <a href="estatisticas.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Estatísticas</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">Sair</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
+                    <h2>Gestão de Clientes</h2>
+                </div>
+                <div class="header-actions">
+                    <button id="addClienteBtn" class="btn btn-primary">+ Novo Cliente</button>
+                    <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
+                </div>
+            </header>
+
+            <!-- Filters -->
+            <div class="filters">
+                <input type="text" id="searchInput" class="search-input" placeholder="🔍 Pesquisar por nome, email ou telemóvel...">
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-info">
+                        <h3 id="totalClientes">0</h3>
+                        <p>Total de Clientes</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="orders-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th>Telemóvel</th>
+                            <th>Morada</th>
+                            <th>Data Registo</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientesTableBody">
+                        <tr>
+                            <td colspan="7" class="loading">Carregando clientes...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para adicionar/editar cliente -->
+    <div id="clienteModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modalTitle">Novo Cliente</h3>
+            <form id="clienteForm">
+                <input type="hidden" id="clienteId">
+                <div class="form-group">
+                    <label for="nome">Nome *</label>
+                    <input type="text" id="nome" name="nome" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="telemovel">Telemóvel *</label>
+                    <input type="text" id="telemovel" name="telemovel" required>
+                </div>
+                <div class="form-group">
+                    <label for="morada">Morada *</label>
+                    <textarea id="morada" name="morada" rows="3" required></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" id="cancelClienteBtn" class="btn btn-secondary">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="admin-common.js"></script>
+    <script src="clientes.js"></script>
+</body>
+</html>
+

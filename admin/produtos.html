@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Produtos - Sweet Cakes</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="admin-sidebar">
+            <div class="sidebar-header">
+                <h1>🍰 Sweet Cakes</h1>
+                <p>Painel Administrativo</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📦</span>
+                    <span>Encomendas</span>
+                </a>
+                <a href="clientes.html" class="nav-item">
+                    <span class="icon">👥</span>
+                    <span>Clientes</span>
+                </a>
+                <a href="produtos.html" class="nav-item active">
+                    <span class="icon">🍰</span>
+                    <span>Produtos</span>
+                </a>
+                <a href="funcionarios.html" class="nav-item">
+                    <span class="icon">👔</span>
+                    <span>Funcionários</span>
+                </a>
+                <a href="estatisticas.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Estatísticas</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">Sair</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
+                    <h2>Gestão de Produtos</h2>
+                </div>
+                <div class="header-actions">
+                    <button id="addProdutoBtn" class="btn btn-primary">+ Novo Produto</button>
+                    <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
+                </div>
+            </header>
+
+            <!-- Filters -->
+            <div class="filters">
+                <select id="disponibilidadeFilter" class="filter-select">
+                    <option value="">Todos</option>
+                    <option value="1">Disponíveis</option>
+                    <option value="0">Indisponíveis</option>
+                </select>
+                <input type="text" id="searchInput" class="search-input" placeholder="🔍 Pesquisar por nome...">
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🍰</div>
+                    <div class="stat-info">
+                        <h3 id="totalProdutos">0</h3>
+                        <p>Total de Produtos</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-info">
+                        <h3 id="disponiveisCount">0</h3>
+                        <p>Disponíveis</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Grid -->
+            <div id="produtosGrid" class="products-grid">
+                <div class="loading">Carregando produtos...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para adicionar/editar produto -->
+    <div id="produtoModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close">&times;</span>
+            <h3 id="modalTitle">Novo Produto</h3>
+            <form id="produtoForm" enctype="multipart/form-data">
+                <input type="hidden" id="produtoId">
+                <div class="form-group">
+                    <label for="produtoNome">Nome *</label>
+                    <input type="text" id="produtoNome" name="nome" required>
+                </div>
+                <div class="form-group">
+                    <label for="produtoDescricao">Descrição *</label>
+                    <textarea id="produtoDescricao" name="descricao" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="produtoPreco">Preço (€) *</label>
+                    <input type="number" id="produtoPreco" name="preco" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="produtoDisponivel">Disponível</label>
+                    <select id="produtoDisponivel" name="disponivel">
+                        <option value="1">Sim</option>
+                        <option value="0">Não</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="produtoImagem">Imagem</label>
+                    <input type="file" id="produtoImagem" name="imagem" accept="image/*">
+                    <div id="imagemPreview" style="margin-top: 10px;"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" id="cancelProdutoBtn" class="btn btn-secondary">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="admin-common.js"></script>
+    <script src="produtos.js"></script>
+</body>
+</html>
+
