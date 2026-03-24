@@ -36,19 +36,20 @@ error_reporting(E_ALL);
 
 ob_start();
 
-$appConfig = require __DIR__ . '../src/config/app_config.php';
+$appConfig = require __DIR__ . '/../src/config/app_config.php';
 define('APP_DEBUG', !empty($appConfig['app_debug']));
 // #region agent log
 sc_debug_log('H1', 'index.php:40', 'Configuração app carregada', [
     'app_env' => $appConfig['app_env'] ?? null,
     'app_debug' => !empty($appConfig['app_debug']),
-    'has_local_app_config' => file_exists(__DIR__ . '/src/config/app_config.local.php'),
+    'has_local_app_config' => file_exists(__DIR__ . '/../src/config/app_config.local.php'),
 ]);
 // #endregion
 
-require_once __DIR__ . '../src/helpers/Auth.php';
-require_once __DIR__ . '../src/helpers/PasswordHelper.php';
-require_once __DIR__ . '../src/helpers/AuditHelper.php';
+require_once __DIR__ . '/../src/config/database.php';
+require_once __DIR__ . '/../src/helpers/Auth.php';
+require_once __DIR__ . '/../src/helpers/PasswordHelper.php';
+require_once __DIR__ . '/../src/helpers/AuditHelper.php';
 Auth::setConfig($appConfig);
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -76,7 +77,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 header('Content-Type: application/json; charset=UTF-8');
 
-require_once '../src/config/app_config.php';
 if (!defined('SC_DEBUG_APP_ENV')) {
     define('SC_DEBUG_APP_ENV', (string) ($appConfig['app_env'] ?? ''));
 }
@@ -97,12 +97,12 @@ sc_debug_log('H2', 'index.php:74', 'Configuração BD carregada', [
     'db_host' => $databaseConfig['host'] ?? null,
     'db_name' => $databaseConfig['db_name'] ?? null,
     'db_user' => $databaseConfig['username'] ?? null,
-    'has_local_db_config' => file_exists(__DIR__ . '/src/config/database.local.php'),
+    'has_local_db_config' => file_exists(__DIR__ . '/../src/config/database.local.php'),
 ]);
 // #endregion
 
-$controllerPath = __DIR__ . '/src/controllers/';
-$modelPath = __DIR__ . '/src/models/';
+$controllerPath = __DIR__ . '/../src/controllers/';
+$modelPath = __DIR__ . '/../src/models/';
 
 foreach (glob($modelPath . '*.php') as $filename) {
     require_once $filename;
@@ -227,7 +227,7 @@ if ($resource === null || $resource === '' || !isset($routes[$resource])) {
     http_response_code(404);
     echo json_encode([
         'error' => 'Rota não encontrada',
-        'hint' => 'Use /index.php/produtos, /index.php/login, etc.',
+        'hint' => 'Use /index.php?route=produtos, /index.php?route=login, etc.',
     ]);
     exit();
 }
