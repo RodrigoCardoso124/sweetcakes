@@ -36,7 +36,7 @@ error_reporting(E_ALL);
 
 ob_start();
 
-$appConfig = require __DIR__ . '/src/config/app_config.php';
+$appConfig = require __DIR__ . '../src/config/app_config.php';
 define('APP_DEBUG', !empty($appConfig['app_debug']));
 // #region agent log
 sc_debug_log('H1', 'index.php:40', 'Configuração app carregada', [
@@ -46,9 +46,9 @@ sc_debug_log('H1', 'index.php:40', 'Configuração app carregada', [
 ]);
 // #endregion
 
-require_once __DIR__ . '/src/helpers/Auth.php';
-require_once __DIR__ . '/src/helpers/PasswordHelper.php';
-require_once __DIR__ . '/src/helpers/AuditHelper.php';
+require_once __DIR__ . '../src/helpers/Auth.php';
+require_once __DIR__ . '../src/helpers/PasswordHelper.php';
+require_once __DIR__ . '../src/helpers/AuditHelper.php';
 Auth::setConfig($appConfig);
 
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 header('Content-Type: application/json; charset=UTF-8');
 
-require_once __DIR__ . '/src/config/database.php';
+require_once '../src/config/app_config.php';
 if (!defined('SC_DEBUG_APP_ENV')) {
     define('SC_DEBUG_APP_ENV', (string) ($appConfig['app_env'] ?? ''));
 }
