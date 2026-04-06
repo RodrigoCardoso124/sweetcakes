@@ -49,7 +49,8 @@ class ProdutoController {
 
         $hasPresetFlow = !empty($config['cloud_name']) && !empty($config['upload_preset']);
         $hasSignedFlow = !empty($config['cloud_name']) && !empty($config['api_key']) && !empty($config['api_secret']);
-        $config['enabled'] = !empty($config['enabled']) && ($hasPresetFlow || $hasSignedFlow);
+        $allowByFlag = !array_key_exists('enabled', $config) || $config['enabled'] !== false;
+        $config['enabled'] = $allowByFlag && ($hasPresetFlow || $hasSignedFlow);
         return $config;
     }
 
@@ -135,6 +136,10 @@ class ProdutoController {
 
     private function uploadImagemCloudinary($file, &$errorMessage = null) {
         $cfg = $this->cloudinaryConfig;
+        if (!function_exists('curl_init')) {
+            $errorMessage = "cURL não está ativo no PHP para upload Cloudinary.";
+            return null;
+        }
         $cloudName = $cfg['cloud_name'] ?? null;
         if (empty($cloudName)) {
             $errorMessage = "Cloudinary sem cloud_name.";
