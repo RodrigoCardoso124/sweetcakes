@@ -17,6 +17,7 @@ const PUBLIC_BASE_URL = (function () {
 
 function getProdutoImageUrl(imagemPath) {
   if (!imagemPath) return null;
+  if (/^https?:\/\//i.test(imagemPath)) return imagemPath;
   var base = PUBLIC_BASE_URL.replace(/\/$/, '');
   return base + '/image.php?path=' + encodeURIComponent(imagemPath);
 }
@@ -178,6 +179,7 @@ const API = {
       formData.append('descricao', data.descricao);
       formData.append('preco', data.preco);
       formData.append('disponivel', data.disponivel || 1);
+      formData.append('alergenios', data.alergenios || '');
       formData.append('imagem', imageFile);
       var response = await fetch(buildApiUrl('produtos'), {
         method: 'POST',
@@ -208,6 +210,7 @@ const API = {
       if (data.descricao) formData.append('descricao', data.descricao);
       if (data.preco) formData.append('preco', data.preco);
       if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
+      if (data.alergenios !== undefined) formData.append('alergenios', data.alergenios);
       formData.append('imagem', imageFile);
       var response = await fetch(buildApiUrl('produtos/' + encodeURIComponent(id)), {
         method: 'PUT',

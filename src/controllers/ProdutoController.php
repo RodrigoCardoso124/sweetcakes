@@ -14,10 +14,51 @@ class ProdutoController {
         $this->produto = new Produto($db);
         $this->produtoIngrediente = new ProdutoIngrediente($db);
         $this->ingrediente = new Ingredientes($db);
+        $this->ensureAlergeniosColumn();
     }
 
     /** Diretório base das imagens de produtos (relativo à raiz do projeto). */
     private const UPLOAD_DIR = "uploads/produtos";
+
+    private function ensureAlergeniosColumn() {
+        $stmt = $this->db->query("SHOW COLUMNS FROM produtos LIKE 'alergenios'");
+        if (!$stmt || !$stmt->fetch(PDO::FETCH_ASSOC)) {
+            $this->db->exec("ALTER TABLE produtos ADD COLUMN alergenios TEXT NULL");
+        }
+    }
+
+    private function getPublicBaseUrl() {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
+        $basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+        return $scheme . '://' . $host . ($basePath === '' ? '' : $basePath);
+    }
+
+    private function parseAlergenios($raw) {
+        if (is_array($raw)) {
+            $items = $raw;
+        } else {
+            $decoded = json_decode((string) $raw, true);
+            if (is_array($decoded)) {
+                $items = $decoded;
+            } else {
+                $items = array_map('trim', explode(',', (string) $raw));
+            }
+        }
+
+        $clean = [];
+        foreach ($items as $item) {
+            $value = trim((string) $item);
+            if ($value !== '') $clean[] = $value;
+        }
+        return array_values(array_unique($clean));
+    }
+
+    private function normalizarAlergeniosParaGuardar($raw) {
+        $parsed = $this->parseAlergenios($raw);
+        return empty($parsed) ? null : json_encode($parsed, JSON_UNESCAPED_UNICODE);
+    }
 
     /**
      * Converte o valor da BD (nome ou caminho) para o caminho completo para a API.
@@ -27,6 +68,11 @@ class ProdutoController {
         if (empty($imagem)) return null;
         // CORREÇÃO: se for apenas nome do ficheiro, acrescenta o diretório
         return (strpos($imagem, '/') !== false) ? $imagem : self::UPLOAD_DIR . "/" . $imagem;
+    }
+
+    private function imagemUrlPublica($imagemPath) {
+        if (empty($imagemPath)) return null;
+        return $this->getPublicBaseUrl() . "/image.php?path=" . rawurlencode($imagemPath);
     }
 
     /**
@@ -48,7 +94,9 @@ class ProdutoController {
         foreach ($rows as &$row) {
             if (isset($row['imagem'])) {
                 $row['imagem'] = $this->imagemParaResposta($row['imagem']);
+                $row['imagem_url'] = $this->imagemUrlPublica($row['imagem']);
             }
+            $row['alergenios'] = $this->parseAlergenios($row['alergenios'] ?? null);
         }
         echo json_encode($rows);
     }
@@ -64,7 +112,9 @@ class ProdutoController {
         if ($data) {
             if (isset($data['imagem'])) {
                 $data['imagem'] = $this->imagemParaResposta($data['imagem']);
+                $data['imagem_url'] = $this->imagemUrlPublica($data['imagem']);
             }
+            $data['alergenios'] = $this->parseAlergenios($data['alergenios'] ?? null);
             echo json_encode($data);
         } else {
             http_response_code(404);
@@ -101,6 +151,7 @@ class ProdutoController {
         $this->produto->preco      = $data['preco'];
         $this->produto->disponivel = 1;
         $this->produto->imagem     = $nomeImagem;
+        $this->produto->alergenios = $this->normalizarAlergeniosParaGuardar($data['alergenios'] ?? null);
 
         if ($this->produto->create()) {
             http_response_code(201);
@@ -145,6 +196,9 @@ class ProdutoController {
         $this->produto->preco      = $data['preco']      ?? $produtoAtual['preco'];
         $this->produto->disponivel = $produtoAtual['disponivel'];
         $this->produto->imagem     = $imagemValor;
+        $this->produto->alergenios = array_key_exists('alergenios', $data)
+            ? $this->normalizarAlergeniosParaGuardar($data['alergenios'])
+            : ($produtoAtual['alergenios'] ?? null);
 
         if ($this->produto->update()) {
             echo json_encode(["message" => "Produto atualizado com sucesso"]);

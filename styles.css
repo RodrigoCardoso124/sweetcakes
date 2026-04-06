@@ -648,6 +648,21 @@ body {
     color: var(--danger);
 }
 
+.pagination {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.pagination-info {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-right: 8px;
+}
+
 /* Products Grid */
 .products-grid {
     display: grid;
@@ -745,6 +760,23 @@ body {
     font-weight: 700;
     color: var(--primary-color);
     margin-bottom: 16px;
+}
+
+.allergen-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 12px;
+}
+
+.allergen-tag {
+    display: inline-block;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffe69c;
 }
 
 .product-actions {

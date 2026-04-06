@@ -1,5 +1,7 @@
 // Clientes management
 let allClientes = [];
+let currentClientesPage = 1;
+const CLIENTES_PER_PAGE = 10;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof initAdminShell === 'function') {
@@ -51,13 +53,20 @@ async function loadClientes() {
 
 function renderClientes(clientes) {
     const tbody = document.getElementById('clientesTableBody');
+    const pagination = document.getElementById('clientesPagination');
     
     if (clientes.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading">Nenhum cliente encontrado</td></tr>';
+        if (pagination) pagination.innerHTML = '';
         return;
     }
 
-    tbody.innerHTML = clientes.map(cliente => {
+    const totalPages = Math.max(1, Math.ceil(clientes.length / CLIENTES_PER_PAGE));
+    if (currentClientesPage > totalPages) currentClientesPage = totalPages;
+    const start = (currentClientesPage - 1) * CLIENTES_PER_PAGE;
+    const pageItems = clientes.slice(start, start + CLIENTES_PER_PAGE);
+
+    tbody.innerHTML = pageItems.map(cliente => {
         const dataRegisto = cliente.data_registo 
             ? new Date(cliente.data_registo).toLocaleDateString('pt-PT')
             : 'N/A';
@@ -77,12 +86,21 @@ function renderClientes(clientes) {
             </tr>
         `;
     }).join('');
+
+    if (pagination) {
+        pagination.innerHTML = `
+            <span class="pagination-info">Página ${currentClientesPage} de ${totalPages}</span>
+            <button class="btn btn-secondary" ${currentClientesPage <= 1 ? 'disabled' : ''} onclick="changeClientesPage(-1)">Anterior</button>
+            <button class="btn btn-secondary" ${currentClientesPage >= totalPages ? 'disabled' : ''} onclick="changeClientesPage(1)">Seguinte</button>
+        `;
+    }
 }
 
-function filterClientes() {
+function filterClientes(resetPage = true) {
     const search = document.getElementById('searchInput').value.toLowerCase();
     
     if (!search) {
+        if (resetPage) currentClientesPage = 1;
         renderClientes(allClientes);
         return;
     }
@@ -93,6 +111,7 @@ function filterClientes() {
         (c.telemovel && c.telemovel.includes(search))
     );
 
+    if (resetPage) currentClientesPage = 1;
     renderClientes(filtered);
 }
 
@@ -183,4 +202,8 @@ function escapeHtml(text) {
 // Make functions available globally
 window.editCliente = editCliente;
 window.deleteCliente = deleteCliente;
+window.changeClientesPage = function(delta) {
+    currentClientesPage = Math.max(1, currentClientesPage + delta);
+    filterClientes(false);
+};
 

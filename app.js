@@ -1,6 +1,8 @@
 // Painel de encomendas
 let allEncomendas = [];
 let clientesCache = {};
+let currentEncomendasPage = 1;
+const ENCOMENDAS_PER_PAGE = 10;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
@@ -111,13 +113,20 @@ function exportEncomendasCsv() {
 
 function renderEncomendas(encomendas) {
   var tbody = document.getElementById('ordersTableBody');
+  var pagination = document.getElementById('encomendasPagination');
 
   if (encomendas.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" class="loading">Nenhuma encomenda encontrada</td></tr>';
+    if (pagination) pagination.innerHTML = '';
     return;
   }
 
-  tbody.innerHTML = encomendas
+  var totalPages = Math.max(1, Math.ceil(encomendas.length / ENCOMENDAS_PER_PAGE));
+  if (currentEncomendasPage > totalPages) currentEncomendasPage = totalPages;
+  var start = (currentEncomendasPage - 1) * ENCOMENDAS_PER_PAGE;
+  var pageItems = encomendas.slice(start, start + ENCOMENDAS_PER_PAGE);
+
+  tbody.innerHTML = pageItems
     .map((encomenda) => {
       var cliente = clientesCache[encomenda.cliente_id] || {
         nome: 'Cliente #' + encomenda.cliente_id,
@@ -163,6 +172,21 @@ function renderEncomendas(encomendas) {
     })
     .join('');
 
+  if (pagination) {
+    pagination.innerHTML =
+      '<span class="pagination-info">Página ' +
+      currentEncomendasPage +
+      ' de ' +
+      totalPages +
+      '</span>' +
+      '<button class="btn btn-secondary" ' +
+      (currentEncomendasPage <= 1 ? 'disabled' : '') +
+      ' onclick="changeEncomendasPage(-1)">Anterior</button>' +
+      '<button class="btn btn-secondary" ' +
+      (currentEncomendasPage >= totalPages ? 'disabled' : '') +
+      ' onclick="changeEncomendasPage(1)">Seguinte</button>';
+  }
+
   tbody.querySelectorAll('.action-btn.edit').forEach((btn) => {
     btn.addEventListener('click', () => {
       openStatusModal(parseInt(btn.getAttribute('data-eid'), 10), btn.getAttribute('data-estado'));
@@ -194,7 +218,8 @@ function formatDate(dateString) {
   });
 }
 
-function filterEncomendas() {
+function filterEncomendas(resetPage) {
+  if (resetPage === undefined) resetPage = true;
   var statusFilter = document.getElementById('statusFilter').value;
   var searchInput = document.getElementById('searchInput').value.toLowerCase();
 
@@ -215,6 +240,7 @@ function filterEncomendas() {
     });
   }
 
+  if (resetPage) currentEncomendasPage = 1;
   renderEncomendas(filtered);
 }
 
@@ -292,3 +318,7 @@ async function updateOrderStatus() {
 }
 
 window.openStatusModal = openStatusModal;
+window.changeEncomendasPage = function (delta) {
+  currentEncomendasPage = Math.max(1, currentEncomendasPage + delta);
+  filterEncomendas(false);
+};

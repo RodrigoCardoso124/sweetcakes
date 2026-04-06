@@ -9,6 +9,7 @@ class Produto {
     public $preco;
     public $disponivel;
     public $imagem;
+    public $alergenios;
 
     public function __construct($db) {
         $this->conn = $db;
@@ -18,7 +19,7 @@ class Produto {
     // LISTAR TODOS
     // ------------------------------------------------------------
     public function getAll() {
-        $query = "SELECT produto_id, nome, descricao, preco, disponivel, imagem 
+        $query = "SELECT produto_id, nome, descricao, preco, disponivel, imagem, alergenios
                   FROM {$this->table}";
         $stmt  = $this->conn->prepare($query);
         $stmt->execute();
@@ -29,7 +30,7 @@ class Produto {
     // MOSTRAR POR ID
     // ------------------------------------------------------------
     public function getById() {
-        $query = "SELECT produto_id, nome, descricao, preco, disponivel, imagem 
+        $query = "SELECT produto_id, nome, descricao, preco, disponivel, imagem, alergenios
                   FROM {$this->table} 
                   WHERE produto_id = :id LIMIT 1";
         $stmt  = $this->conn->prepare($query);
@@ -43,14 +44,15 @@ class Produto {
     // ------------------------------------------------------------
     public function create() {
         $query = "INSERT INTO {$this->table}
-                    (nome, descricao, preco, disponivel, imagem)
-                  VALUES (:nome, :descricao, :preco, :disponivel, :imagem)";
+                    (nome, descricao, preco, disponivel, imagem, alergenios)
+                  VALUES (:nome, :descricao, :preco, :disponivel, :imagem, :alergenios)";
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":nome", $this->nome);
         $stmt->bindValue(":descricao", $this->descricao);
         $stmt->bindValue(":preco", $this->preco);
         $stmt->bindValue(":disponivel", $this->disponivel);
         $stmt->bindValue(":imagem", $this->imagem);
+        $stmt->bindValue(":alergenios", $this->alergenios);
         return $stmt->execute();
     }
 
@@ -63,7 +65,8 @@ class Produto {
                       descricao = :descricao,
                       preco = :preco,
                       disponivel = :disponivel,
-                      imagem = :imagem
+                      imagem = :imagem,
+                      alergenios = :alergenios
                   WHERE produto_id = :id";
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":nome", $this->nome);
@@ -71,6 +74,7 @@ class Produto {
         $stmt->bindValue(":preco", $this->preco);
         $stmt->bindValue(":disponivel", $this->disponivel);
         $stmt->bindValue(":imagem", $this->imagem);
+        $stmt->bindValue(":alergenios", $this->alergenios);
         $stmt->bindValue(":id", $this->produto_id);
         return $stmt->execute();
     }

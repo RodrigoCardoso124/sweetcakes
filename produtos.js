@@ -7,10 +7,14 @@ let allProdutos = [];
 const PLACEHOLDER_SEM_IMAGEM = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%23e8e8e8' width='300' height='200'/%3E%3Ctext x='150' y='100' text-anchor='middle' fill='%23999' font-size='14'%3ESem Imagem%3C/text%3E%3C/svg%3E";
 window.PLACEHOLDER_SEM_IMAGEM = PLACEHOLDER_SEM_IMAGEM;
 
-// Constrói URL da imagem usando image.php (Agora com ../ para sair da pasta admin)
+// Constrói URL da imagem usando endpoint central da API.
 function getProdutoImageUrl(imagemPath) {
     if (!imagemPath) return PLACEHOLDER_SEM_IMAGEM;
-    return `../image.php?path=${encodeURIComponent(imagemPath.replace(/\\/g, '/'))}`;
+    if (/^https?:\/\//i.test(imagemPath)) return imagemPath;
+    if (typeof window.getProdutoImageUrl === 'function' && window.getProdutoImageUrl !== getProdutoImageUrl) {
+        return window.getProdutoImageUrl(imagemPath.replace(/\\/g, '/'));
+    }
+    return `image.php?path=${encodeURIComponent(imagemPath.replace(/\\/g, '/'))}`;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -66,9 +70,13 @@ function renderProdutos(produtos) {
     }
 
     grid.innerHTML = produtos.map(produto => {
-        const imagemUrl = produto.imagem
-            ? getProdutoImageUrl(produto.imagem)
-            : PLACEHOLDER_SEM_IMAGEM;
+        const imagemUrl = produto.imagem_url
+            ? getProdutoImageUrl(produto.imagem_url)
+            : (produto.imagem ? getProdutoImageUrl(produto.imagem) : PLACEHOLDER_SEM_IMAGEM);
+        const alergenios = Array.isArray(produto.alergenios) ? produto.alergenios : [];
+        const alergeniosHtml = alergenios.length
+            ? `<div class="allergen-tags">${alergenios.map(a => `<span class="allergen-tag">${escapeHtml(a)}</span>`).join('')}</div>`
+            : '';
         
         return `
             <div class="product-card">
@@ -82,6 +90,7 @@ function renderProdutos(produtos) {
                 <div class="product-info">
                     <h3>${escapeHtml(produto.nome)}</h3>
                     <p class="product-description">${escapeHtml(produto.descricao || 'Sem descrição')}</p>
+                    ${alergeniosHtml || ''}
                     <div class="product-price">€${parseFloat(produto.preco || 0).toFixed(2)}</div>
                     <div class="product-actions">
                         <button class="btn btn-secondary" onclick="editProduto(${produto.produto_id})">Editar</button>
@@ -127,6 +136,9 @@ function openProdutoModal(produto = null) {
         document.getElementById('produtoDescricao').value = produto.descricao || '';
         document.getElementById('produtoPreco').value = produto.preco || '';
         document.getElementById('produtoDisponivel').value = produto.disponivel || 1;
+        document.getElementById('produtoAlergenios').value = Array.isArray(produto.alergenios)
+            ? produto.alergenios.join(', ')
+            : '';
         
         if (produto.imagem) {
             const imgUrl = getProdutoImageUrl(produto.imagem);
@@ -160,7 +172,8 @@ async function saveProduto(e) {
         nome: document.getElementById('produtoNome').value,
         descricao: document.getElementById('produtoDescricao').value,
         preco: document.getElementById('produtoPreco').value,
-        disponivel: document.getElementById('produtoDisponivel').value
+        disponivel: document.getElementById('produtoDisponivel').value,
+        alergenios: document.getElementById('produtoAlergenios').value
     };
     
     const imageFile = document.getElementById('produtoImagem').files[0];

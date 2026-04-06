@@ -1,6 +1,8 @@
 // Funcionarios management
 let allFuncionarios = [];
 let allPessoas = [];
+let currentFuncionariosPage = 1;
+const FUNCIONARIOS_PER_PAGE = 10;
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof initAdminShell === 'function') {
@@ -92,13 +94,20 @@ async function loadPessoasForFuncionarios() {
 
 function renderFuncionarios(funcionarios) {
     const tbody = document.getElementById('funcionariosTableBody');
+    const pagination = document.getElementById('funcionariosPagination');
     
     if (funcionarios.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="loading">Nenhum funcionário encontrado</td></tr>';
+        if (pagination) pagination.innerHTML = '';
         return;
     }
 
-    tbody.innerHTML = funcionarios.map(func => {
+    const totalPages = Math.max(1, Math.ceil(funcionarios.length / FUNCIONARIOS_PER_PAGE));
+    if (currentFuncionariosPage > totalPages) currentFuncionariosPage = totalPages;
+    const start = (currentFuncionariosPage - 1) * FUNCIONARIOS_PER_PAGE;
+    const pageItems = funcionarios.slice(start, start + FUNCIONARIOS_PER_PAGE);
+
+    tbody.innerHTML = pageItems.map(func => {
         const pessoa = func.pessoa || {};
         const dataEntrada = func.data_entrada 
             ? new Date(func.data_entrada).toLocaleDateString('pt-PT')
@@ -118,12 +127,21 @@ function renderFuncionarios(funcionarios) {
             </tr>
         `;
     }).join('');
+
+    if (pagination) {
+        pagination.innerHTML = `
+            <span class="pagination-info">Página ${currentFuncionariosPage} de ${totalPages}</span>
+            <button class="btn btn-secondary" ${currentFuncionariosPage <= 1 ? 'disabled' : ''} onclick="changeFuncionariosPage(-1)">Anterior</button>
+            <button class="btn btn-secondary" ${currentFuncionariosPage >= totalPages ? 'disabled' : ''} onclick="changeFuncionariosPage(1)">Seguinte</button>
+        `;
+    }
 }
 
-function filterFuncionarios() {
+function filterFuncionarios(resetPage = true) {
     const search = document.getElementById('searchInput').value.toLowerCase();
     
     if (!search) {
+        if (resetPage) currentFuncionariosPage = 1;
         renderFuncionarios(allFuncionarios);
         return;
     }
@@ -135,6 +153,7 @@ function filterFuncionarios() {
                (f.cargo && f.cargo.toLowerCase().includes(search));
     });
 
+    if (resetPage) currentFuncionariosPage = 1;
     renderFuncionarios(filtered);
 }
 
@@ -223,4 +242,8 @@ function escapeHtml(text) {
 // Make functions available globally
 window.editFuncionario = editFuncionario;
 window.deleteFuncionario = deleteFuncionario;
+window.changeFuncionariosPage = function(delta) {
+    currentFuncionariosPage = Math.max(1, currentFuncionariosPage + delta);
+    filterFuncionarios(false);
+};
 
