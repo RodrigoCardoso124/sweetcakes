@@ -67,13 +67,13 @@ class UtilizadorController
         $configuredBase = trim((string) ($appConfig['public_api_base_url'] ?? ''));
         if ($configuredBase !== '') {
             $base = rtrim($configuredBase, '/');
-            return "{$base}/verify_email?email=" . urlencode($email) . "&code=" . urlencode($code);
+            return "{$base}?route=verify_email&email=" . urlencode($email) . "&code=" . urlencode($code);
         }
 
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
-        return "{$scheme}://{$host}{$scriptName}/verify_email?email=" . urlencode($email) . "&code=" . urlencode($code);
+        return "{$scheme}://{$host}{$scriptName}?route=verify_email&email=" . urlencode($email) . "&code=" . urlencode($code);
     }
 
     private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
