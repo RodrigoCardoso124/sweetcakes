@@ -79,5 +79,31 @@ class Pessoa {
         $stmt->bindValue(":id", $this->pessoa_id);
         return $stmt->execute();
     }
+
+    public function setEmailVerificationCode($pessoaId, $code) {
+        $query = "UPDATE {$this->table}
+                  SET email_verificado = 0,
+                      email_verificacao_codigo = :code,
+                      email_verificacao_data = NOW()
+                  WHERE pessoa_id = :id";
+        $stmt  = $this->conn->prepare($query);
+        $stmt->bindValue(":code", $code);
+        $stmt->bindValue(":id", $pessoaId);
+        return $stmt->execute();
+    }
+
+    public function verifyEmailWithCode($email, $code) {
+        $query = "UPDATE {$this->table}
+                  SET email_verificado = 1,
+                      email_verificacao_codigo = NULL
+                  WHERE email = :email
+                    AND email_verificacao_codigo = :code
+                  LIMIT 1";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindValue(":email", $email);
+        $stmt->bindValue(":code", $code);
+        $stmt->execute();
+        return $stmt->rowCount() > 0;
+    }
 }
 ?>

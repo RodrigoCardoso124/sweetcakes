@@ -4,6 +4,7 @@ include_once __DIR__ . '/../models/Pessoa.php';
 include_once __DIR__ . '/../models/Funcionario.php';
 require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/PasswordHelper.php';
+require_once __DIR__ . '/../helpers/email_helper.php';
 
 class UtilizadorController
 {
@@ -18,6 +19,61 @@ class UtilizadorController
         $this->utilizador = new Utilizador($db);
         $this->pessoa = new Pessoa($db);
         $this->funcionario = new Funcionario($db);
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM {$table} LIKE :column");
+            $stmt->bindValue(':column', $column);
+            $stmt->execute();
+            return (bool) $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            error_log("columnExists({$table}.{$column}): " . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function ensureEmailVerificationSchema(): void
+    {
+        try {
+            if (!$this->columnExists('pessoas', 'email_verificado')) {
+                $this->db->exec("ALTER TABLE pessoas ADD COLUMN email_verificado TINYINT(1) NOT NULL DEFAULT 1");
+            }
+            if (!$this->columnExists('pessoas', 'email_verificacao_codigo')) {
+                $this->db->exec("ALTER TABLE pessoas ADD COLUMN email_verificacao_codigo VARCHAR(8) NULL DEFAULT NULL");
+            }
+            if (!$this->columnExists('pessoas', 'email_verificacao_data')) {
+                $this->db->exec("ALTER TABLE pessoas ADD COLUMN email_verificacao_data DATETIME NULL DEFAULT NULL");
+            }
+        } catch (Throwable $e) {
+            error_log('ensureEmailVerificationSchema: ' . $e->getMessage());
+        }
+    }
+
+    private function loadAppConfig(): array
+    {
+        $file = __DIR__ . '/../config/app_config.php';
+        if (!file_exists($file)) {
+            return [];
+        }
+        $cfg = require $file;
+        return is_array($cfg) ? $cfg : [];
+    }
+
+    private function buildVerificationUrl(string $email, string $code): string
+    {
+        $appConfig = $this->loadAppConfig();
+        $configuredBase = trim((string) ($appConfig['public_api_base_url'] ?? ''));
+        if ($configuredBase !== '') {
+            $base = rtrim($configuredBase, '/');
+            return "{$base}/verify_email?email=" . urlencode($email) . "&code=" . urlencode($code);
+        }
+
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
+        return "{$scheme}://{$host}{$scriptName}/verify_email?email=" . urlencode($email) . "&code=" . urlencode($code);
     }
 
     private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
@@ -65,6 +121,7 @@ class UtilizadorController
 
     public function store($data)
     {
+        $this->ensureEmailVerificationSchema();
         if (!isset($data['pessoas_pessoa_id'], $data['password'])) {
             http_response_code(400);
             echo json_encode(['message' => 'pessoas_pessoa_id e password são obrigatórios']);
@@ -74,7 +131,8 @@ class UtilizadorController
 
         $this->pessoa->pessoa_id = $data['pessoas_pessoa_id'];
         $stmt = $this->pessoa->getById();
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+        $pessoaData = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$pessoaData) {
             http_response_code(400);
             echo json_encode(['message' => 'Pessoa não encontrada']);
 
@@ -93,7 +151,20 @@ class UtilizadorController
         $this->utilizador->pessoas_pessoa_id = $data['pessoas_pessoa_id'];
 
         if ($this->utilizador->create()) {
-            echo json_encode(['message' => 'Utilizador criado com sucesso']);
+            $verificationCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            $this->pessoa->setEmailVerificationCode((int) $data['pessoas_pessoa_id'], $verificationCode);
+            $verificationUrl = $this->buildVerificationUrl((string) ($pessoaData['email'] ?? ''), $verificationCode);
+            $emailSent = enviar_email_verificacao(
+                (string) ($pessoaData['email'] ?? ''),
+                (string) ($pessoaData['nome'] ?? ''),
+                $verificationUrl
+            );
+
+            echo json_encode([
+                'message' => 'Utilizador criado com sucesso',
+                'email_verification_required' => true,
+                'email_sent' => $emailSent,
+            ]);
         } else {
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao criar utilizador']);
@@ -196,6 +267,7 @@ class UtilizadorController
 
     public function login($data)
     {
+        $this->ensureEmailVerificationSchema();
         if (!isset($data['email'], $data['password'])) {
             http_response_code(400);
             echo json_encode(['message' => 'email e password são obrigatórios']);
@@ -214,6 +286,12 @@ class UtilizadorController
         $pessoa = $match['pessoa'];
         $user = $match['user'];
 
+        if (isset($pessoa['email_verificado']) && (int) $pessoa['email_verificado'] !== 1) {
+            http_response_code(403);
+            echo json_encode(['message' => 'Precisa de verificar o email antes de iniciar sessão']);
+            return;
+        }
+
         $this->funcionario->pessoas_pessoa_id = $pessoa['pessoa_id'];
         $stmt = $this->funcionario->getByPessoaId();
         $func = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -225,6 +303,45 @@ class UtilizadorController
             'success' => true,
             'message' => 'Login efetuado com sucesso',
         ], $this->jsonSessionPayload($user, $pessoa, $func ?: null, $sessionToken)));
+    }
+
+    public function verifyEmail($data)
+    {
+        $this->ensureEmailVerificationSchema();
+        if (!isset($data['email'], $data['code'])) {
+            http_response_code(400);
+            echo json_encode(['message' => 'email e code são obrigatórios']);
+            return;
+        }
+
+        $email = trim((string) $data['email']);
+        $code = trim((string) $data['code']);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $code === '') {
+            http_response_code(400);
+            echo json_encode(['message' => 'Dados inválidos']);
+            return;
+        }
+
+        $ok = $this->pessoa->verifyEmailWithCode($email, $code);
+        if (!$ok) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Código de verificação inválido']);
+            return;
+        }
+
+        echo json_encode(['success' => true, 'message' => 'Email verificado com sucesso']);
+    }
+
+    public function verifyEmailLink($email, $code)
+    {
+        $this->ensureEmailVerificationSchema();
+        $ok = $this->pessoa->verifyEmailWithCode((string) $email, (string) $code);
+        header('Content-Type: text/html; charset=UTF-8');
+        if ($ok) {
+            echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#5B25F0;'>Email confirmado com sucesso</h2><p>A sua conta já está ativa. Pode voltar à app e iniciar sessão.</p></div></body></html>";
+            return;
+        }
+        echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#fff7f7;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#b00020;'>Não foi possível confirmar</h2><p>O link é inválido ou já expirou.</p></div></body></html>";
     }
 
     public function adminLogin($data)
