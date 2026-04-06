@@ -26,8 +26,8 @@ if (!str_contains($path, '/')) {
     $path = "uploads/produtos/" . $path;
 }
 
-// Caminho absoluto do ficheiro
-$imagePath = __DIR__ . '/' . $path;
+// Caminho absoluto do ficheiro (uploads fica na raiz do projeto, fora da pasta /api)
+$imagePath = realpath(__DIR__ . '/../') . '/' . $path;
 
 // Verifica se o ficheiro existe
 if (!file_exists($imagePath) || !is_file($imagePath)) {
