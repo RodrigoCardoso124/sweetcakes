@@ -8,6 +8,7 @@ class ProdutoController {
     private $produto;
     private $produtoIngrediente;
     private $ingrediente;
+    private $cloudinaryConfig;
 
     public function __construct($db) {
         $this->db = $db;
@@ -15,10 +16,42 @@ class ProdutoController {
         $this->produtoIngrediente = new ProdutoIngrediente($db);
         $this->ingrediente = new Ingredientes($db);
         $this->ensureAlergeniosColumn();
+        $this->cloudinaryConfig = $this->loadCloudinaryConfig();
     }
 
     /** Diretório base das imagens de produtos (relativo à raiz do projeto). */
     private const UPLOAD_DIR = "uploads/produtos";
+
+    private function loadCloudinaryConfig() {
+        $config = [
+            'enabled' => false,
+            'cloud_name' => getenv('CLOUDINARY_CLOUD_NAME') ?: null,
+            'api_key' => getenv('CLOUDINARY_API_KEY') ?: null,
+            'api_secret' => getenv('CLOUDINARY_API_SECRET') ?: null,
+            'upload_preset' => getenv('CLOUDINARY_UPLOAD_PRESET') ?: null,
+            'folder' => getenv('CLOUDINARY_FOLDER') ?: 'sweet_cakes/produtos',
+        ];
+
+        $localFile = __DIR__ . '/../config/cloudinary_config.php';
+        if (file_exists($localFile)) {
+            $local = require $localFile;
+            if (is_array($local)) {
+                $config = array_merge($config, $local);
+            }
+        }
+        $localOverride = __DIR__ . '/../config/cloudinary_config.local.php';
+        if (file_exists($localOverride)) {
+            $override = require $localOverride;
+            if (is_array($override)) {
+                $config = array_merge($config, $override);
+            }
+        }
+
+        $hasPresetFlow = !empty($config['cloud_name']) && !empty($config['upload_preset']);
+        $hasSignedFlow = !empty($config['cloud_name']) && !empty($config['api_key']) && !empty($config['api_secret']);
+        $config['enabled'] = !empty($config['enabled']) && ($hasPresetFlow || $hasSignedFlow);
+        return $config;
+    }
 
     private function ensureAlergeniosColumn() {
         $stmt = $this->db->query("SHOW COLUMNS FROM produtos LIKE 'alergenios'");
@@ -60,18 +93,118 @@ class ProdutoController {
         return empty($parsed) ? null : json_encode($parsed, JSON_UNESCAPED_UNICODE);
     }
 
+    private function guardarImagemUpload($file, &$errorMessage = null) {
+        if (!isset($file['error']) || (int) $file['error'] !== UPLOAD_ERR_OK) {
+            $errorMessage = "Upload de imagem inválido.";
+            return null;
+        }
+
+        if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            $errorMessage = "Ficheiro temporário inválido.";
+            return null;
+        }
+
+        if (!empty($this->cloudinaryConfig['enabled'])) {
+            return $this->uploadImagemCloudinary($file, $errorMessage);
+        }
+
+        $targetDir = __DIR__ . "/../../" . self::UPLOAD_DIR . "/";
+        if (!file_exists($targetDir) && !mkdir($targetDir, 0777, true)) {
+            $errorMessage = "Não foi possível criar a pasta de uploads.";
+            return null;
+        }
+
+        $originalName = $file['name'] ?? 'imagem';
+        $safeBase = preg_replace('/[^A-Za-z0-9._-]/', '_', basename($originalName));
+        $nomeImagem = uniqid("produto_") . "_" . $safeBase;
+        $targetFile = $targetDir . $nomeImagem;
+
+        if (!move_uploaded_file($file["tmp_name"], $targetFile)) {
+            $errorMessage = "Falha ao guardar a imagem no servidor.";
+            return null;
+        }
+
+        if (!file_exists($targetFile) || filesize($targetFile) <= 0) {
+            @unlink($targetFile);
+            $errorMessage = "Imagem guardada de forma inválida.";
+            return null;
+        }
+
+        return $nomeImagem;
+    }
+
+    private function uploadImagemCloudinary($file, &$errorMessage = null) {
+        $cfg = $this->cloudinaryConfig;
+        $cloudName = $cfg['cloud_name'] ?? null;
+        if (empty($cloudName)) {
+            $errorMessage = "Cloudinary sem cloud_name.";
+            return null;
+        }
+
+        $folder = $cfg['folder'] ?? 'sweet_cakes/produtos';
+        $endpoint = "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload";
+        $postFields = [
+            'file' => new CURLFile($file['tmp_name'], $file['type'] ?? 'application/octet-stream', $file['name'] ?? 'upload'),
+            'folder' => $folder,
+        ];
+
+        if (!empty($cfg['upload_preset'])) {
+            $postFields['upload_preset'] = $cfg['upload_preset'];
+        } else {
+            $apiKey = $cfg['api_key'] ?? null;
+            $apiSecret = $cfg['api_secret'] ?? null;
+            if (empty($apiKey) || empty($apiSecret)) {
+                $errorMessage = "Cloudinary sem upload_preset ou credenciais API.";
+                return null;
+            }
+            $timestamp = time();
+            $signature = sha1("folder={$folder}&timestamp={$timestamp}{$apiSecret}");
+            $postFields['api_key'] = $apiKey;
+            $postFields['timestamp'] = $timestamp;
+            $postFields['signature'] = $signature;
+        }
+
+        $ch = curl_init($endpoint);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $postFields,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false || $curlError) {
+            $errorMessage = "Falha ao contactar Cloudinary: " . ($curlError ?: 'erro desconhecido');
+            return null;
+        }
+
+        $decoded = json_decode($response, true);
+        if ($httpCode < 200 || $httpCode >= 300 || !is_array($decoded) || empty($decoded['secure_url'])) {
+            $cloudMsg = $decoded['error']['message'] ?? 'upload recusado';
+            $errorMessage = "Cloudinary erro: {$cloudMsg}";
+            return null;
+        }
+
+        return $decoded['secure_url'];
+    }
+
     /**
      * Converte o valor da BD (nome ou caminho) para o caminho completo para a API.
      * Na BD guardamos apenas o nome do ficheiro; na resposta enviamos o caminho completo.
      */
     private function imagemParaResposta($imagem) {
         if (empty($imagem)) return null;
+        if (preg_match('/^https?:\/\//i', $imagem)) return $imagem;
         // CORREÇÃO: se for apenas nome do ficheiro, acrescenta o diretório
         return (strpos($imagem, '/') !== false) ? $imagem : self::UPLOAD_DIR . "/" . $imagem;
     }
 
     private function imagemUrlPublica($imagemPath) {
         if (empty($imagemPath)) return null;
+        if (preg_match('/^https?:\/\//i', $imagemPath)) return $imagemPath;
         return $this->getPublicBaseUrl() . "/image.php?path=" . rawurlencode($imagemPath);
     }
 
@@ -81,6 +214,7 @@ class ProdutoController {
      */
     private function imagemParaFicheiro($imagem) {
         if (empty($imagem)) return null;
+        if (preg_match('/^https?:\/\//i', $imagem)) return null;
         $base = __DIR__ . "/../../";
         return (strpos($imagem, '/') !== false) ? $base . $imagem : $base . self::UPLOAD_DIR . "/" . $imagem;
     }
@@ -136,14 +270,13 @@ class ProdutoController {
 
         $nomeImagem = null;
         if ($files && isset($files['imagem']) && $files['imagem']['error'] === 0) {
-            $targetDir = __DIR__ . "/../../" . self::UPLOAD_DIR . "/";
-            if (!file_exists($targetDir)) {
-                mkdir($targetDir, 0777, true);
+            $uploadError = null;
+            $nomeImagem = $this->guardarImagemUpload($files['imagem'], $uploadError);
+            if ($nomeImagem === null) {
+                http_response_code(422);
+                echo json_encode(["message" => $uploadError ?? "Erro no upload da imagem"]);
+                return;
             }
-            $file = $files['imagem'];
-            $nomeImagem = uniqid("produto_") . "_" . basename($file["name"]);
-            $targetFile = $targetDir . $nomeImagem;
-            move_uploaded_file($file["tmp_name"], $targetFile);
         }
 
         $this->produto->nome       = $data['nome'];
@@ -182,12 +315,13 @@ class ProdutoController {
         $imagemValor = $produtoAtual['imagem'];
 
         if ($files && isset($files['imagem']) && $files['imagem']['error'] === 0) {
-            $targetDir = __DIR__ . "/../../" . self::UPLOAD_DIR . "/";
-            if (!file_exists($targetDir)) mkdir($targetDir, 0777, true);
-            $file = $files['imagem'];
-            $nomeImagem = uniqid("produto_") . "_" . basename($file["name"]);
-            $targetFile = $targetDir . $nomeImagem;
-            move_uploaded_file($file["tmp_name"], $targetFile);
+            $uploadError = null;
+            $nomeImagem = $this->guardarImagemUpload($files['imagem'], $uploadError);
+            if ($nomeImagem === null) {
+                http_response_code(422);
+                echo json_encode(["message" => $uploadError ?? "Erro no upload da imagem"]);
+                return;
+            }
             $imagemValor = $nomeImagem;
         }
 
