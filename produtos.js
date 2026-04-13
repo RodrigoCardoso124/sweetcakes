@@ -2,7 +2,7 @@
 
 // Produtos management
 let allProdutos = [];
-const ALERGENIOS_OPCOES = ['Glúten', 'Leite', 'Ovo', 'Frutos secos', 'Amendoim', 'Soja', 'Sésamo', 'Peixe', 'Marisco', 'Sulfitos'];
+const ALERGENIOS_OPCOES = ['Glúten', 'Leite', 'Ovo', 'Frutos secos', 'Amendoim', 'Soja' , 'Sulfitos'];
 
 // Placeholder SVG inline para produtos sem imagem
 const PLACEHOLDER_SEM_IMAGEM = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%23e8e8e8' width='300' height='200'/%3E%3Ctext x='150' y='100' text-anchor='middle' fill='%23999' font-size='14'%3ESem Imagem%3C/text%3E%3C/svg%3E";
