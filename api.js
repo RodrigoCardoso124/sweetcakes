@@ -3,16 +3,12 @@ const API_DEBUG = false;
 
 const API_BASE_URL = (function () {
   if (typeof window.API_BASE_URL !== 'undefined') return window.API_BASE_URL;
-  var path = window.location.pathname || '';
-  var base = path.indexOf('/admin') !== -1 ? path.replace(/\/admin\/.*$/, '') : '';
-  return window.location.origin + (base || '') + '/index.php';
+  return window.location.origin + '/api/index.php';
 })();
 
 const PUBLIC_BASE_URL = (function () {
   if (typeof window.PUBLIC_BASE_URL !== 'undefined') return window.PUBLIC_BASE_URL;
-  var path = window.location.pathname || '';
-  var base = path.indexOf('/admin') !== -1 ? path.replace(/\/admin\/.*$/, '') : '';
-  return window.location.origin + (base || '');
+  return window.location.origin;
 })();
 
 function getProdutoImageUrl(imagemPath) {

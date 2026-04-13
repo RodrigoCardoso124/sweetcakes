@@ -51,6 +51,14 @@ class ProdutoController {
         $hasSignedFlow = !empty($config['cloud_name']) && !empty($config['api_key']) && !empty($config['api_secret']);
         $allowByFlag = !array_key_exists('enabled', $config) || $config['enabled'] !== false;
         $config['enabled'] = $allowByFlag && ($hasPresetFlow || $hasSignedFlow);
+        $config['missing_reason'] = null;
+        if (!$config['enabled']) {
+            if (empty($config['cloud_name'])) {
+                $config['missing_reason'] = 'CLOUDINARY_CLOUD_NAME';
+            } elseif (empty($config['upload_preset']) && (empty($config['api_key']) || empty($config['api_secret']))) {
+                $config['missing_reason'] = 'CLOUDINARY_UPLOAD_PRESET ou CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET';
+            }
+        }
         return $config;
     }
 
@@ -107,6 +115,13 @@ class ProdutoController {
 
         if (!isset($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
             $errorMessage = "Ficheiro temporário inválido.";
+            return null;
+        }
+
+        $isVercel = !empty($_SERVER['VERCEL']) || getenv('VERCEL');
+        if ($isVercel && empty($this->cloudinaryConfig['enabled'])) {
+            $reason = $this->cloudinaryConfig['missing_reason'] ?? 'configuração Cloudinary em falta';
+            $errorMessage = "Cloudinary não ativo em produção (falta {$reason}).";
             return null;
         }
 
