@@ -19,7 +19,7 @@ function getProdutoImageUrl(imagemPath) {
   if (!imagemPath) return null;
   if (/^https?:\/\//i.test(imagemPath)) return imagemPath;
   var base = PUBLIC_BASE_URL.replace(/\/$/, '');
-  return base + '/image.php?path=' + encodeURIComponent(imagemPath);
+  return base + '/api/image.php?path=' + encodeURIComponent(imagemPath);
 }
 
 function apiSessionHeaders() {

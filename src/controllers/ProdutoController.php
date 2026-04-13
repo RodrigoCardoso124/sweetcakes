@@ -62,8 +62,13 @@ class ProdutoController {
     }
 
     private function getPublicBaseUrl() {
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+        if (!empty($forwardedProto)) {
+            $scheme = strtolower(trim(explode(',', $forwardedProto)[0])) === 'https' ? 'https' : 'http';
+        } else {
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        }
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? ($_SERVER['HTTP_HOST'] ?? 'localhost');
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
         $basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
         return $scheme . '://' . $host . ($basePath === '' ? '' : $basePath);

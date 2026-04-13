@@ -14,7 +14,7 @@ function getProdutoImageUrl(imagemPath) {
     if (typeof window.getProdutoImageUrl === 'function' && window.getProdutoImageUrl !== getProdutoImageUrl) {
         return window.getProdutoImageUrl(imagemPath.replace(/\\/g, '/'));
     }
-    return `image.php?path=${encodeURIComponent(imagemPath.replace(/\\/g, '/'))}`;
+    return `api/image.php?path=${encodeURIComponent(imagemPath.replace(/\\/g, '/'))}`;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
