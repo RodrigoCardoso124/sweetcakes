@@ -3,6 +3,7 @@ let allFuncionarios = [];
 let allPessoas = [];
 let currentFuncionariosPage = 1;
 const FUNCIONARIOS_PER_PAGE = 10;
+let funcionariosFiltrados = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof initAdminShell === 'function') {
@@ -74,7 +75,8 @@ async function loadFuncionarios() {
         // Load pessoa data for each funcionario
         await loadPessoasForFuncionarios();
         
-        renderFuncionarios(allFuncionarios);
+        funcionariosFiltrados = allFuncionarios.slice();
+        renderFuncionarios(funcionariosFiltrados);
         updateStats(allFuncionarios);
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="6" class="error-container">Erro ao carregar funcionários: ${error.message}</td></tr>`;
@@ -128,13 +130,7 @@ function renderFuncionarios(funcionarios) {
         `;
     }).join('');
 
-    if (pagination) {
-        pagination.innerHTML = `
-            <span class="pagination-info">Página ${currentFuncionariosPage} de ${totalPages}</span>
-            <button class="btn btn-secondary" ${currentFuncionariosPage <= 1 ? 'disabled' : ''} onclick="changeFuncionariosPage(-1)">Anterior</button>
-            <button class="btn btn-secondary" ${currentFuncionariosPage >= totalPages ? 'disabled' : ''} onclick="changeFuncionariosPage(1)">Seguinte</button>
-        `;
-    }
+    renderPagination(pagination, currentFuncionariosPage, totalPages, 'goToFuncionariosPage');
 }
 
 function filterFuncionarios(resetPage = true) {
@@ -142,11 +138,12 @@ function filterFuncionarios(resetPage = true) {
     
     if (!search) {
         if (resetPage) currentFuncionariosPage = 1;
-        renderFuncionarios(allFuncionarios);
+        funcionariosFiltrados = allFuncionarios.slice();
+        renderFuncionarios(funcionariosFiltrados);
         return;
     }
 
-    const filtered = allFuncionarios.filter(f => {
+    funcionariosFiltrados = allFuncionarios.filter(f => {
         const pessoa = f.pessoa || {};
         return (pessoa.nome && pessoa.nome.toLowerCase().includes(search)) ||
                (pessoa.email && pessoa.email.toLowerCase().includes(search)) ||
@@ -154,7 +151,20 @@ function filterFuncionarios(resetPage = true) {
     });
 
     if (resetPage) currentFuncionariosPage = 1;
-    renderFuncionarios(filtered);
+    renderFuncionarios(funcionariosFiltrados);
+}
+function renderPagination(container, current, total, handlerName) {
+    if (!container) return;
+    const pages = [];
+    const start = Math.max(1, current - 2);
+    const end = Math.min(total, current + 2);
+    for (let p = start; p <= end; p++) pages.push(p);
+    container.innerHTML = `
+        <span class="pagination-info">Página ${current} de ${total}</span>
+        <button class="pagination-btn" ${current <= 1 ? 'disabled' : ''} onclick="${handlerName}(${current - 1})">‹</button>
+        ${pages.map(p => `<button class="pagination-btn ${p === current ? 'active' : ''}" onclick="${handlerName}(${p})">${p}</button>`).join('')}
+        <button class="pagination-btn" ${current >= total ? 'disabled' : ''} onclick="${handlerName}(${current + 1})">›</button>
+    `;
 }
 
 function updateStats(funcionarios) {
@@ -242,8 +252,8 @@ function escapeHtml(text) {
 // Make functions available globally
 window.editFuncionario = editFuncionario;
 window.deleteFuncionario = deleteFuncionario;
-window.changeFuncionariosPage = function(delta) {
-    currentFuncionariosPage = Math.max(1, currentFuncionariosPage + delta);
+window.goToFuncionariosPage = function(page) {
+    currentFuncionariosPage = Math.max(1, page);
     filterFuncionarios(false);
 };
 

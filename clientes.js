@@ -2,6 +2,7 @@
 let allClientes = [];
 let currentClientesPage = 1;
 const CLIENTES_PER_PAGE = 10;
+let clientesFiltrados = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof initAdminShell === 'function') {
@@ -44,7 +45,8 @@ async function loadClientes() {
 
     try {
         allClientes = await API.getPessoas();
-        renderClientes(allClientes);
+        clientesFiltrados = allClientes.slice();
+        renderClientes(clientesFiltrados);
         updateStats(allClientes);
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="7" class="error-container">Erro ao carregar clientes: ${error.message}</td></tr>`;
@@ -87,13 +89,7 @@ function renderClientes(clientes) {
         `;
     }).join('');
 
-    if (pagination) {
-        pagination.innerHTML = `
-            <span class="pagination-info">Página ${currentClientesPage} de ${totalPages}</span>
-            <button class="btn btn-secondary" ${currentClientesPage <= 1 ? 'disabled' : ''} onclick="changeClientesPage(-1)">Anterior</button>
-            <button class="btn btn-secondary" ${currentClientesPage >= totalPages ? 'disabled' : ''} onclick="changeClientesPage(1)">Seguinte</button>
-        `;
-    }
+    renderPagination(pagination, currentClientesPage, totalPages, 'goToClientesPage');
 }
 
 function filterClientes(resetPage = true) {
@@ -101,18 +97,32 @@ function filterClientes(resetPage = true) {
     
     if (!search) {
         if (resetPage) currentClientesPage = 1;
-        renderClientes(allClientes);
+        clientesFiltrados = allClientes.slice();
+        renderClientes(clientesFiltrados);
         return;
     }
 
-    const filtered = allClientes.filter(c => 
+    clientesFiltrados = allClientes.filter(c => 
         (c.nome && c.nome.toLowerCase().includes(search)) ||
         (c.email && c.email.toLowerCase().includes(search)) ||
         (c.telemovel && c.telemovel.includes(search))
     );
 
     if (resetPage) currentClientesPage = 1;
-    renderClientes(filtered);
+    renderClientes(clientesFiltrados);
+}
+function renderPagination(container, current, total, handlerName) {
+    if (!container) return;
+    const pages = [];
+    const start = Math.max(1, current - 2);
+    const end = Math.min(total, current + 2);
+    for (let p = start; p <= end; p++) pages.push(p);
+    container.innerHTML = `
+        <span class="pagination-info">Página ${current} de ${total}</span>
+        <button class="pagination-btn" ${current <= 1 ? 'disabled' : ''} onclick="${handlerName}(${current - 1})">‹</button>
+        ${pages.map(p => `<button class="pagination-btn ${p === current ? 'active' : ''}" onclick="${handlerName}(${p})">${p}</button>`).join('')}
+        <button class="pagination-btn" ${current >= total ? 'disabled' : ''} onclick="${handlerName}(${current + 1})">›</button>
+    `;
 }
 
 function updateStats(clientes) {
@@ -202,8 +212,8 @@ function escapeHtml(text) {
 // Make functions available globally
 window.editCliente = editCliente;
 window.deleteCliente = deleteCliente;
-window.changeClientesPage = function(delta) {
-    currentClientesPage = Math.max(1, currentClientesPage + delta);
+window.goToClientesPage = function(page) {
+    currentClientesPage = Math.max(1, page);
     filterClientes(false);
 };
 

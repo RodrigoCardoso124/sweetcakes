@@ -3,6 +3,7 @@ let allEncomendas = [];
 let clientesCache = {};
 let currentEncomendasPage = 1;
 const ENCOMENDAS_PER_PAGE = 10;
+let encomendasFiltradas = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
@@ -45,7 +46,8 @@ async function loadEncomendas() {
   try {
     allEncomendas = await API.getAllEncomendas();
     await loadClientes();
-    renderEncomendas(allEncomendas);
+    encomendasFiltradas = allEncomendas.slice();
+    renderEncomendas(encomendasFiltradas);
     updateStats(allEncomendas);
   } catch (error) {
     tbody.innerHTML =
@@ -172,20 +174,7 @@ function renderEncomendas(encomendas) {
     })
     .join('');
 
-  if (pagination) {
-    pagination.innerHTML =
-      '<span class="pagination-info">Página ' +
-      currentEncomendasPage +
-      ' de ' +
-      totalPages +
-      '</span>' +
-      '<button class="btn btn-secondary" ' +
-      (currentEncomendasPage <= 1 ? 'disabled' : '') +
-      ' onclick="changeEncomendasPage(-1)">Anterior</button>' +
-      '<button class="btn btn-secondary" ' +
-      (currentEncomendasPage >= totalPages ? 'disabled' : '') +
-      ' onclick="changeEncomendasPage(1)">Seguinte</button>';
-  }
+  renderPagination(pagination, currentEncomendasPage, totalPages, 'goToEncomendasPage');
 
   tbody.querySelectorAll('.action-btn.edit').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -241,7 +230,22 @@ function filterEncomendas(resetPage) {
   }
 
   if (resetPage) currentEncomendasPage = 1;
-  renderEncomendas(filtered);
+  encomendasFiltradas = filtered;
+  renderEncomendas(encomendasFiltradas);
+}
+function renderPagination(container, current, total, handlerName) {
+  if (!container) return;
+  var pages = [];
+  var start = Math.max(1, current - 2);
+  var end = Math.min(total, current + 2);
+  for (var p = start; p <= end; p++) pages.push(p);
+  container.innerHTML =
+    '<span class="pagination-info">Página ' + current + ' de ' + total + '</span>' +
+    '<button class="pagination-btn" ' + (current <= 1 ? 'disabled' : '') + ' onclick="' + handlerName + '(' + (current - 1) + ')">‹</button>' +
+    pages.map(function(page) {
+      return '<button class="pagination-btn ' + (page === current ? 'active' : '') + '" onclick="' + handlerName + '(' + page + ')">' + page + '</button>';
+    }).join('') +
+    '<button class="pagination-btn" ' + (current >= total ? 'disabled' : '') + ' onclick="' + handlerName + '(' + (current + 1) + ')">›</button>';
 }
 
 function updateStats(encomendas) {
@@ -318,7 +322,7 @@ async function updateOrderStatus() {
 }
 
 window.openStatusModal = openStatusModal;
-window.changeEncomendasPage = function (delta) {
-  currentEncomendasPage = Math.max(1, currentEncomendasPage + delta);
+window.goToEncomendasPage = function (page) {
+  currentEncomendasPage = Math.max(1, page);
   filterEncomendas(false);
 };

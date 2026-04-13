@@ -2,6 +2,7 @@
 
 // Produtos management
 let allProdutos = [];
+const ALERGENIOS_OPCOES = ['Glúten', 'Leite', 'Ovo', 'Frutos secos', 'Amendoim', 'Soja', 'Sésamo', 'Peixe', 'Marisco', 'Sulfitos'];
 
 // Placeholder SVG inline para produtos sem imagem
 const PLACEHOLDER_SEM_IMAGEM = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect fill='%23e8e8e8' width='300' height='200'/%3E%3Ctext x='150' y='100' text-anchor='middle' fill='%23999' font-size='14'%3ESem Imagem%3C/text%3E%3C/svg%3E";
@@ -46,6 +47,30 @@ function setupEventListeners() {
 
     document.getElementById('produtoForm').addEventListener('submit', saveProduto);
     document.getElementById('produtoImagem').addEventListener('change', handleImagePreview);
+    renderAlergeniosOptions();
+}
+
+function renderAlergeniosOptions() {
+    const container = document.getElementById('produtoAlergeniosOptions');
+    if (!container) return;
+    container.innerHTML = ALERGENIOS_OPCOES.map((nome, i) => `
+        <label class="allergen-option">
+            <input type="checkbox" value="${nome}" id="alergOpt${i}">
+            <span>${escapeHtml(nome)}</span>
+        </label>
+    `).join('');
+}
+
+function setAlergeniosSelecionados(values = []) {
+    const set = new Set((values || []).map(v => String(v).trim().toLowerCase()));
+    document.querySelectorAll('#produtoAlergeniosOptions input[type="checkbox"]').forEach(el => {
+        el.checked = set.has(String(el.value).trim().toLowerCase());
+    });
+}
+
+function getAlergeniosSelecionados() {
+    return Array.from(document.querySelectorAll('#produtoAlergeniosOptions input[type="checkbox"]:checked'))
+        .map(el => el.value);
 }
 
 async function loadProdutos() {
@@ -136,9 +161,7 @@ function openProdutoModal(produto = null) {
         document.getElementById('produtoDescricao').value = produto.descricao || '';
         document.getElementById('produtoPreco').value = produto.preco || '';
         document.getElementById('produtoDisponivel').value = produto.disponivel || 1;
-        document.getElementById('produtoAlergenios').value = Array.isArray(produto.alergenios)
-            ? produto.alergenios.join(', ')
-            : '';
+        setAlergeniosSelecionados(Array.isArray(produto.alergenios) ? produto.alergenios : []);
         
         if (produto.imagem) {
             const imgUrl = getProdutoImageUrl(produto.imagem);
@@ -146,6 +169,7 @@ function openProdutoModal(produto = null) {
         }
     } else {
         title.textContent = 'Novo Produto';
+        setAlergeniosSelecionados([]);
     }
     
     modal.classList.add('active');
@@ -173,7 +197,7 @@ async function saveProduto(e) {
         descricao: document.getElementById('produtoDescricao').value,
         preco: document.getElementById('produtoPreco').value,
         disponivel: document.getElementById('produtoDisponivel').value,
-        alergenios: document.getElementById('produtoAlergenios').value
+        alergenios: getAlergeniosSelecionados().join(', ')
     };
     
     const imageFile = document.getElementById('produtoImagem').files[0];
