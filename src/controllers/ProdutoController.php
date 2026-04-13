@@ -23,13 +23,20 @@ class ProdutoController {
     private const UPLOAD_DIR = "uploads/produtos";
 
     private function loadCloudinaryConfig() {
+        $env = function($key) {
+            if (isset($_ENV[$key]) && $_ENV[$key] !== '') return $_ENV[$key];
+            if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return $_SERVER[$key];
+            $value = getenv($key);
+            return ($value !== false && $value !== '') ? $value : null;
+        };
+
         $config = [
             'enabled' => false,
-            'cloud_name' => getenv('CLOUDINARY_CLOUD_NAME') ?: null,
-            'api_key' => getenv('CLOUDINARY_API_KEY') ?: null,
-            'api_secret' => getenv('CLOUDINARY_API_SECRET') ?: null,
-            'upload_preset' => getenv('CLOUDINARY_UPLOAD_PRESET') ?: null,
-            'folder' => getenv('CLOUDINARY_FOLDER') ?: 'sweet_cakes/produtos',
+            'cloud_name' => $env('CLOUDINARY_CLOUD_NAME'),
+            'api_key' => $env('CLOUDINARY_API_KEY'),
+            'api_secret' => $env('CLOUDINARY_API_SECRET'),
+            'upload_preset' => $env('CLOUDINARY_UPLOAD_PRESET'),
+            'folder' => $env('CLOUDINARY_FOLDER') ?: 'sweet_cakes/produtos',
         ];
 
         $localFile = __DIR__ . '/../config/cloudinary_config.php';
