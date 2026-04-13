@@ -51,6 +51,20 @@ class UtilizadorController
         }
     }
 
+    private function ensurePasswordResetSchema(): void
+    {
+        try {
+            if (!$this->columnExists('pessoas', 'password_reset_codigo')) {
+                $this->db->exec("ALTER TABLE pessoas ADD COLUMN password_reset_codigo VARCHAR(64) NULL DEFAULT NULL");
+            }
+            if (!$this->columnExists('pessoas', 'password_reset_data')) {
+                $this->db->exec("ALTER TABLE pessoas ADD COLUMN password_reset_data DATETIME NULL DEFAULT NULL");
+            }
+        } catch (Throwable $e) {
+            error_log('ensurePasswordResetSchema: ' . $e->getMessage());
+        }
+    }
+
     private function loadAppConfig(): array
     {
         $file = __DIR__ . '/../config/app_config.php';
@@ -67,13 +81,28 @@ class UtilizadorController
         $configuredBase = trim((string) ($appConfig['public_api_base_url'] ?? ''));
         if ($configuredBase !== '') {
             $base = rtrim($configuredBase, '/');
-            return "{$base}?route=verify_email&email=" . urlencode($email) . "&code=" . urlencode($code);
+            return "{$base}?route=verify_email&email=" . urlencode($email) . '&code=' . urlencode($code);
         }
 
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
-        return "{$scheme}://{$host}{$scriptName}?route=verify_email&email=" . urlencode($email) . "&code=" . urlencode($code);
+        return "{$scheme}://{$host}{$scriptName}?route=verify_email&email=" . urlencode($email) . '&code=' . urlencode($code);
+    }
+
+    private function buildResetPasswordUrl(string $email, string $token): string
+    {
+        $appConfig = $this->loadAppConfig();
+        $configuredBase = trim((string) ($appConfig['public_api_base_url'] ?? ''));
+        if ($configuredBase !== '') {
+            $base = rtrim($configuredBase, '/');
+            return "{$base}?route=reset_password&email=" . urlencode($email) . '&token=' . urlencode($token);
+        }
+
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/api/index.php';
+        return "{$scheme}://{$host}{$scriptName}?route=reset_password&email=" . urlencode($email) . '&token=' . urlencode($token);
     }
 
     private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
@@ -330,6 +359,111 @@ class UtilizadorController
         }
 
         echo json_encode(['success' => true, 'message' => 'Email verificado com sucesso']);
+    }
+
+    public function resetPassword($data): void
+    {
+        $this->ensurePasswordResetSchema();
+        if (!isset($data['email'])) {
+            http_response_code(400);
+            echo json_encode(['message' => 'email é obrigatório']);
+            return;
+        }
+
+        $email = trim((string) $data['email']);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Email inválido']);
+            return;
+        }
+
+        $this->pessoa->email = $email;
+        $stmt = $this->pessoa->getByEmail();
+        $pessoa = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$pessoa) {
+            http_response_code(404);
+            echo json_encode(['message' => 'Email não encontrado']);
+            return;
+        }
+
+        $token = bin2hex(random_bytes(16));
+        $upd = $this->db->prepare('UPDATE pessoas SET password_reset_codigo = :c, password_reset_data = NOW() WHERE pessoa_id = :id');
+        $upd->bindValue(':c', $token);
+        $upd->bindValue(':id', (int) $pessoa['pessoa_id'], PDO::PARAM_INT);
+        $upd->execute();
+
+        $resetUrl = $this->buildResetPasswordUrl($email, $token);
+        $emailSent = enviar_email_reset_password(
+            $email,
+            (string) ($pessoa['nome'] ?? ''),
+            $resetUrl
+        );
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Se o email existir, enviámos um link para redefinir a password',
+            'email_sent' => $emailSent,
+        ]);
+    }
+
+    public function resetPasswordLink(string $email, string $token): void
+    {
+        $this->ensurePasswordResetSchema();
+        $email = trim($email);
+        $token = trim($token);
+        header('Content-Type: text/html; charset=UTF-8');
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $token === '') {
+            echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#fff7f7;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#b00020;'>Link inválido</h2><p>O link para redefinir password é inválido.</p></div></body></html>";
+            return;
+        }
+
+        $stmt = $this->db->prepare('SELECT pessoa_id, password_reset_codigo, password_reset_data FROM pessoas WHERE email = :email LIMIT 1');
+        $stmt->bindValue(':email', $email);
+        $stmt->execute();
+        $pessoa = $stmt->fetch(PDO::FETCH_ASSOC);
+        $isValid = $pessoa
+            && !empty($pessoa['password_reset_codigo'])
+            && hash_equals((string) $pessoa['password_reset_codigo'], $token)
+            && !empty($pessoa['password_reset_data'])
+            && (strtotime((string) $pessoa['password_reset_data']) >= (time() - 3600));
+
+        if (!$isValid) {
+            echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#fff7f7;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#b00020;'>Link expirado ou inválido</h2><p>Peça um novo reset de password na app.</p></div></body></html>";
+            return;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $postedToken = trim((string) ($_POST['token'] ?? $_POST['code'] ?? ''));
+            if ($postedToken === '' || !hash_equals($token, $postedToken)) {
+                echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#fff7f7;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#b00020;'>Sessão inválida</h2><p>Volte a abrir o link do email.</p></div></body></html>";
+                return;
+            }
+            $newPassword = trim((string) ($_POST['new_password'] ?? ''));
+            $confirmPassword = trim((string) ($_POST['confirm_password'] ?? ''));
+
+            if ($newPassword === '' || strlen($newPassword) < 4 || $newPassword !== $confirmPassword) {
+                echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#fff7f7;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#b00020;'>Password inválida</h2><p>A password deve ter pelo menos 4 caracteres e os campos devem coincidir.</p></div></body></html>";
+                return;
+            }
+
+            $hashed = PasswordHelper::hash($newPassword);
+            $ok = $this->utilizador->updatePasswordByPessoaId((int) $pessoa['pessoa_id'], $hashed);
+            if ($ok) {
+                $clr = $this->db->prepare('UPDATE pessoas SET password_reset_codigo = NULL, password_reset_data = NULL WHERE pessoa_id = :id');
+                $clr->bindValue(':id', (int) $pessoa['pessoa_id'], PDO::PARAM_INT);
+                $clr->execute();
+                echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#5B25F0;'>Password alterada com sucesso</h2><p>Já pode voltar à app e iniciar sessão com a nova password.</p></div></body></html>";
+                return;
+            }
+
+            echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#fff7f7;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#b00020;'>Erro ao atualizar</h2><p>Tente novamente mais tarde.</p></div></body></html>";
+            return;
+        }
+
+        $safeEmail = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
+        $safeToken = htmlspecialchars($token, ENT_QUOTES, 'UTF-8');
+        echo "<!doctype html><html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:24px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='color:#5B25F0;'>Redefinir password</h2><p>Email: {$safeEmail}</p><form method='post'><label>Nova password</label><br><input type='password' name='new_password' minlength='4' required style='width:100%;padding:10px;margin:8px 0 14px;border:1px solid #ddd;border-radius:8px;'><label>Confirmar password</label><br><input type='password' name='confirm_password' minlength='4' required style='width:100%;padding:10px;margin:8px 0 18px;border:1px solid #ddd;border-radius:8px;'><input type='hidden' name='email' value='{$safeEmail}'><input type='hidden' name='token' value='{$safeToken}'><button type='submit' style='background:#5B25F0;color:#fff;border:none;padding:12px 18px;border-radius:8px;font-weight:700;cursor:pointer;'>Guardar nova password</button></form></div></body></html>";
     }
 
     public function verifyEmailLink($email, $code)

@@ -187,6 +187,9 @@ function sc_is_public_api_route(?string $resource, string $method): bool
     if ($resource === 'verify_email' && in_array($method, ['GET', 'POST'], true)) {
         return true;
     }
+    if ($resource === 'reset_password' && in_array($method, ['GET', 'POST'], true)) {
+        return true;
+    }
     return false;
 }
 
@@ -225,6 +228,27 @@ if ($resource === 'login' && $httpMethod === 'POST') {
 if ($resource === 'admin' && $subResource === 'login' && $httpMethod === 'POST') {
     $controller = new UtilizadorController($db);
     $controller->adminLogin($input);
+    exit();
+}
+
+if ($resource === 'reset_password') {
+    $controller = new UtilizadorController($db);
+    if ($httpMethod === 'GET' && isset($_GET['email'])) {
+        $resetTok = trim((string) ($_GET['token'] ?? $_GET['code'] ?? ''));
+        if ($resetTok !== '') {
+            if (ob_get_level() > 0) {
+                ob_clean();
+            }
+            $controller->resetPasswordLink((string) $_GET['email'], $resetTok);
+            exit();
+        }
+    }
+    if ($httpMethod === 'POST') {
+        $controller->resetPassword($input ?? []);
+        exit();
+    }
+    http_response_code(405);
+    echo json_encode(['error' => 'Método não permitido']);
     exit();
 }
 
