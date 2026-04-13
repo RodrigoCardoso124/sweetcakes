@@ -155,6 +155,12 @@ $subResource = $uri[1] ?? null;
 $input = json_decode(file_get_contents('php://input'), true);
 $files = $_FILES;
 $httpMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if ($httpMethod === 'POST' && isset($_POST['_method'])) {
+    $override = strtoupper(trim((string) $_POST['_method']));
+    if (in_array($override, ['PUT', 'DELETE'], true)) {
+        $httpMethod = $override;
+    }
+}
 
 $routes = [
     'pessoas' => 'PessoaController',

@@ -207,9 +207,10 @@ const API = {
       if (data.preco) formData.append('preco', data.preco);
       if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
       if (data.alergenios !== undefined) formData.append('alergenios', data.alergenios);
+      formData.append('_method', 'PUT');
       formData.append('imagem', imageFile);
       var response = await fetch(buildApiUrl('produtos/' + encodeURIComponent(id)), {
-        method: 'PUT',
+        method: 'POST',
         credentials: 'include',
         headers: apiSessionHeaders(),
         body: formData
