@@ -117,7 +117,9 @@ async function syncSessionRoleFromServer() {
 
 function enforcePageRole() {
   var scope = document.body.getAttribute('data-page-scope') || 'employee';
-  if (scope === 'admin' && !isCurrentUserAdmin()) {
+  var hasFuncionario = !!localStorage.getItem('adminFuncionarioId');
+  // Só bloqueia quando temos evidência clara de não-admin.
+  if (scope === 'admin' && hasFuncionario && localStorage.getItem('adminIsAdmin') === 'false') {
     window.location.href = 'index.html';
     return false;
   }

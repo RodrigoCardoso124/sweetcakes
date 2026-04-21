@@ -222,6 +222,54 @@ function sc_route_requires_admin(?string $resource, string $method): bool
     return false;
 }
 
+/**
+ * Determina se o utilizador da sessão atual tem privilégios de admin.
+ * Fonte de verdade: base de dados (cargo do funcionário), com fallback para id 13.
+ */
+function sc_is_elevated_admin(PDO $db): bool
+{
+    $funcId = Auth::funcionarioId();
+    $pessoaId = Auth::pessoaId();
+
+    if ($funcId === 13) {
+        return true;
+    }
+
+    if (!$funcId && !$pessoaId) {
+        return false;
+    }
+
+    $sql = "SELECT f.funcionario_id, f.cargo
+            FROM funcionarios f
+            WHERE 1=1";
+    if ($funcId) {
+        $sql .= " AND f.funcionario_id = :fid";
+    } elseif ($pessoaId) {
+        $sql .= " AND f.pessoas_pessoa_id = :pid";
+    }
+    $sql .= " LIMIT 1";
+
+    $stmt = $db->prepare($sql);
+    if ($funcId) {
+        $stmt->bindValue(':fid', (int) $funcId, PDO::PARAM_INT);
+    } elseif ($pessoaId) {
+        $stmt->bindValue(':pid', (int) $pessoaId, PDO::PARAM_INT);
+    }
+    $stmt->execute();
+    $func = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$func) {
+        return false;
+    }
+
+    $cargo = strtolower(trim((string) ($func['cargo'] ?? '')));
+    $cargo = str_replace(['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'], ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'], $cargo);
+    if (strpos($cargo, 'admin') !== false) {
+        return true;
+    }
+
+    return in_array($cargo, ['gerente', 'gestor', 'owner', 'dono', 'ceo'], true);
+}
+
 if ($resource === 'login' && $httpMethod === 'POST') {
     $controller = new UtilizadorController($db);
     $controller->login($input);
@@ -314,13 +362,14 @@ if ($resource === 'session' && $httpMethod === 'GET') {
         exit();
     }
 
+    $isAdmin = sc_is_elevated_admin($db);
     echo json_encode([
         'logged_in' => true,
         'pessoa_id' => Auth::pessoaId(),
         'utilizador_id' => Auth::utilizadorId(),
         'funcionario_id' => Auth::funcionarioId(),
         'is_funcionario' => Auth::isFuncionario(),
-        'is_admin' => Auth::isAdmin(),
+        'is_admin' => $isAdmin,
     ]);
     exit();
 }
@@ -341,7 +390,7 @@ if (!sc_is_public_api_route($resource, $httpMethod)) {
         echo json_encode(['message' => 'Não autenticado. Inicia sessão (login ou admin/login).']);
         exit();
     }
-    $isElevatedAdmin = Auth::isAdmin() || Auth::funcionarioId() === 13;
+    $isElevatedAdmin = sc_is_elevated_admin($db);
     if (sc_route_requires_admin($resource, $httpMethod) && !$isElevatedAdmin) {
         http_response_code(403);
         echo json_encode(['message' => 'Acesso reservado a administradores.']);
