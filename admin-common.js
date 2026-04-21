@@ -14,6 +14,16 @@ function clearAdminSession() {
 
 function isCurrentUserAdmin() {
   try {
+    var token = localStorage.getItem('apiSessionId') || '';
+    if (token && token.indexOf('.') !== -1) {
+      var body = token.split('.')[0];
+      var padded = body.replace(/-/g, '+').replace(/_/g, '/');
+      while (padded.length % 4) padded += '=';
+      var json = atob(padded);
+      var payload = JSON.parse(json);
+      if (payload && payload.adm === true) return true;
+      if (payload && String(payload.fid || '') === '13') return true;
+    }
     if (localStorage.getItem('adminIsAdmin') === 'true') return true;
     return localStorage.getItem('adminFuncionarioId') === '13';
   } catch (e) {

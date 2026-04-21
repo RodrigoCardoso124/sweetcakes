@@ -69,7 +69,7 @@ async function apiRequest(endpoint, method, data) {
     throw err;
   }
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     if (typeof clearAdminSession === 'function') clearAdminSession();
     var path = window.location.pathname || '';
     if (!/login\.html$/i.test(path) && /\/admin\//i.test(path)) {
@@ -140,7 +140,7 @@ const API = {
       credentials: 'include',
       headers: Object.assign({ Accept: 'application/json' }, apiSessionHeaders())
     });
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       if (typeof clearAdminSession === 'function') clearAdminSession();
       var p = window.location.pathname || '';
       if (!/login\.html$/i.test(p) && /\/admin\//i.test(p)) window.location.href = 'login.html';
@@ -183,7 +183,7 @@ const API = {
         headers: apiSessionHeaders(),
         body: formData
       });
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         if (typeof clearAdminSession === 'function') clearAdminSession();
         var p1 = window.location.pathname || '';
         if (!/login\.html$/i.test(p1) && /\/admin\//i.test(p1)) window.location.href = 'login.html';
@@ -215,7 +215,7 @@ const API = {
         headers: apiSessionHeaders(),
         body: formData
       });
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401) {
         if (typeof clearAdminSession === 'function') clearAdminSession();
         var p2 = window.location.pathname || '';
         if (!/login\.html$/i.test(p2) && /\/admin\//i.test(p2)) window.location.href = 'login.html';

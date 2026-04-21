@@ -21,7 +21,7 @@ class EncomendaDetalheController
 
     private function assertOwnsEncomenda(int $encomendaId): bool
     {
-        if (Auth::isAdmin()) {
+        if (Auth::isAdmin() || Auth::isFuncionario()) {
             return true;
         }
         $this->encomenda->encomenda_id = $encomendaId;
