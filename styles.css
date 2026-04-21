@@ -826,6 +826,36 @@ body {
     cursor: pointer;
 }
 
+.insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+}
+
+.insight-card {
+    background: #fffdf9;
+    border: 1px solid #f0e1cf;
+    border-radius: 10px;
+    padding: 14px;
+}
+
+.insight-card h4 {
+    margin-bottom: 6px;
+    font-size: 15px;
+    color: var(--secondary-color);
+}
+
+.insight-card p {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.insight-card small {
+    color: var(--text-secondary);
+}
+
 .product-actions {
     display: flex;
     gap: 8px;

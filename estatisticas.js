@@ -34,14 +34,18 @@ async function getEncomendasForStats() {
 async function loadEstatisticas() {
     try {
         // Load all data in parallel
-        const [encomendasRes, clientesRes, produtosRes] = await Promise.all([
+        const [encomendasRes, clientesRes, produtosRes, funcionariosRes, detalhesRes] = await Promise.all([
             getEncomendasForStats(),
             API.getPessoas(),
-            API.getProdutos()
+            API.getProdutos(),
+            API.getFuncionarios(),
+            API.getEncomendaDetalhes('')
         ]);
         const encomendas = ensureArray(encomendasRes);
         const clientes = ensureArray(clientesRes);
         const produtos = ensureArray(produtosRes);
+        const funcionarios = ensureArray(funcionariosRes);
+        const detalhes = ensureArray(detalhesRes);
 
         // Calculate statistics
         let totalVendas = 0;
@@ -78,6 +82,61 @@ async function loadEstatisticas() {
 
         document.getElementById('produtosDisponiveis').textContent = produtosDisponiveis;
         document.getElementById('produtosIndisponiveis').textContent = produtosIndisponiveis;
+
+        // Rankings
+        const clientesMap = Object.fromEntries(clientes.map(c => [String(c.pessoa_id), c]));
+        const funcionariosMap = Object.fromEntries(funcionarios.map(f => [String(f.funcionario_id), f]));
+        const produtosMap = Object.fromEntries(produtos.map(p => [String(p.produto_id), p]));
+
+        const gastoPorCliente = {};
+        const vendasPorFuncionario = {};
+        const totalPorDia = {};
+        encomendas.forEach(e => {
+            const total = parseFloat((e && e.total) || 0) || 0;
+            const clienteId = String((e && e.cliente_id) || '');
+            const funcionarioId = String((e && e.funcionario_id) || '');
+            const dia = String((e && e.data_criacao) || '').slice(0, 10);
+            if (clienteId) gastoPorCliente[clienteId] = (gastoPorCliente[clienteId] || 0) + total;
+            if (funcionarioId) vendasPorFuncionario[funcionarioId] = (vendasPorFuncionario[funcionarioId] || 0) + total;
+            if (dia) totalPorDia[dia] = (totalPorDia[dia] || 0) + total;
+        });
+
+        const qtdPorProduto = {};
+        detalhes.forEach(d => {
+            const pid = String((d && d.produto_id) || '');
+            const q = parseInt((d && d.quantidade) || 0, 10) || 0;
+            if (pid) qtdPorProduto[pid] = (qtdPorProduto[pid] || 0) + q;
+        });
+
+        const topCliente = Object.entries(gastoPorCliente).sort((a, b) => b[1] - a[1])[0];
+        const topFuncionario = Object.entries(vendasPorFuncionario).sort((a, b) => b[1] - a[1])[0];
+        const topProduto = Object.entries(qtdPorProduto).sort((a, b) => b[1] - a[1])[0];
+        const melhorDia = Object.entries(totalPorDia).sort((a, b) => b[1] - a[1])[0];
+
+        const ticketMedio = encomendas.length ? (totalVendas / encomendas.length) : 0;
+        const taxaEntrega = encomendas.length ? ((encomendasByStatus.entregue / encomendas.length) * 100) : 0;
+
+        if (topCliente) {
+            const c = clientesMap[topCliente[0]] || {};
+            document.getElementById('topClienteNome').textContent = c.nome || ('Cliente #' + topCliente[0]);
+            document.getElementById('topClienteInfo').textContent = `Total gasto: €${topCliente[1].toFixed(2)}`;
+        }
+        if (topFuncionario) {
+            const f = funcionariosMap[topFuncionario[0]] || {};
+            document.getElementById('topFuncionarioNome').textContent = (f.cargo ? `${f.cargo} ` : '') + `#${topFuncionario[0]}`;
+            document.getElementById('topFuncionarioInfo').textContent = `Vendas geridas: €${topFuncionario[1].toFixed(2)}`;
+        }
+        if (topProduto) {
+            const p = produtosMap[topProduto[0]] || {};
+            document.getElementById('topProdutoNome').textContent = p.nome || ('Produto #' + topProduto[0]);
+            document.getElementById('topProdutoInfo').textContent = `Unidades vendidas: ${topProduto[1]}`;
+        }
+        document.getElementById('ticketMedioValor').textContent = `€${ticketMedio.toFixed(2)}`;
+        document.getElementById('taxaEntregaValor').textContent = `${taxaEntrega.toFixed(1)}%`;
+        if (melhorDia) {
+            document.getElementById('melhorDiaNome').textContent = melhorDia[0];
+            document.getElementById('melhorDiaInfo').textContent = `Faturação: €${melhorDia[1].toFixed(2)}`;
+        }
 
     } catch (error) {
         console.error('Error loading statistics:', error);

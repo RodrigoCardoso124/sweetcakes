@@ -11,16 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (typeof requireAdminPageAuth === 'function' && !requireAdminPageAuth()) return;
 
     loadFuncionarios();
-    loadPessoas();
     setupEventListeners();
 });
 
 function setupEventListeners() {
     // Refresh
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-        loadFuncionarios();
-        loadPessoas();
-    });
+    document.getElementById('refreshBtn').addEventListener('click', loadFuncionarios);
 
     // Add button
     document.getElementById('addFuncionarioBtn').addEventListener('click', () => openFuncionarioModal());
@@ -44,15 +40,6 @@ function setupEventListeners() {
     document.getElementById('funcionarioForm').addEventListener('submit', saveFuncionario);
 }
 
-async function loadPessoas() {
-    try {
-        allPessoas = await API.getPessoas();
-        updatePessoaSelect();
-    } catch (error) {
-        console.error('Error loading pessoas:', error);
-    }
-}
-
 function updatePessoaSelect() {
     const select = document.getElementById('pessoaSelect');
     select.innerHTML = '<option value="">Selecione um cliente...</option>';
@@ -70,27 +57,29 @@ async function loadFuncionarios() {
     tbody.innerHTML = '<tr><td colspan="6" class="loading">Carregando funcionários...</td></tr>';
 
     try {
-        allFuncionarios = await API.getFuncionarios();
-        
-        // Load pessoa data for each funcionario
-        await loadPessoasForFuncionarios();
-        
+        // Otimização: carregar funcionários e pessoas em paralelo (evita N+1 requests por funcionário).
+        const [funcionariosRes, pessoasRes] = await Promise.all([
+            API.getFuncionarios(),
+            API.getPessoas(),
+        ]);
+        allFuncionarios = Array.isArray(funcionariosRes) ? funcionariosRes : [];
+        allPessoas = Array.isArray(pessoasRes) ? pessoasRes : [];
+
+        const pessoasMap = Object.create(null);
+        allPessoas.forEach(p => {
+            pessoasMap[String(p.pessoa_id)] = p;
+        });
+        allFuncionarios = allFuncionarios.map(func => ({
+            ...func,
+            pessoa: pessoasMap[String(func.pessoas_pessoa_id)] || null,
+        }));
+
+        updatePessoaSelect();
         funcionariosFiltrados = allFuncionarios.slice();
         renderFuncionarios(funcionariosFiltrados);
         updateStats(allFuncionarios);
     } catch (error) {
         tbody.innerHTML = `<tr><td colspan="6" class="error-container">Erro ao carregar funcionários: ${error.message}</td></tr>`;
-    }
-}
-
-async function loadPessoasForFuncionarios() {
-    for (let func of allFuncionarios) {
-        try {
-            const pessoa = await API.getPessoa(func.pessoas_pessoa_id);
-            func.pessoa = pessoa;
-        } catch (error) {
-            console.error(`Error loading pessoa for funcionario ${func.funcionario_id}:`, error);
-        }
     }
 }
 
