@@ -88,6 +88,15 @@ class Auth
         $_SESSION['funcionario_id'] = isset($payload['fid']) && $payload['fid'] !== null ? (int) $payload['fid'] : null;
     }
 
+    private static function isAdminCargo(?array $funcionarioRow): bool
+    {
+        if (empty($funcionarioRow) || !isset($funcionarioRow['cargo'])) {
+            return false;
+        }
+        $cargo = strtolower(trim((string) $funcionarioRow['cargo']));
+        return in_array($cargo, ['admin', 'administrador', 'administradora'], true);
+    }
+
     private static function tryAuthenticateFromToken(): bool
     {
         $token = self::getHeaderSessionToken();
@@ -205,7 +214,7 @@ class Auth
         session_regenerate_id(true);
         $_SESSION['utilizador_id'] = (int) $userRow['utilizador_id'];
         $_SESSION['pessoa_id'] = (int) $pessoaRow['pessoa_id'];
-        $_SESSION['is_admin'] = (bool) $funcionarioRow;
+        $_SESSION['is_admin'] = self::isAdminCargo($funcionarioRow);
         $_SESSION['funcionario_id'] = $funcionarioRow ? (int) $funcionarioRow['funcionario_id'] : null;
     }
 
@@ -219,7 +228,7 @@ class Auth
             'uid' => (int) ($userRow['utilizador_id'] ?? 0),
             'pid' => (int) ($pessoaRow['pessoa_id'] ?? 0),
             'fid' => $funcionarioRow ? (int) ($funcionarioRow['funcionario_id'] ?? 0) : null,
-            'adm' => (bool) $funcionarioRow,
+            'adm' => self::isAdminCargo($funcionarioRow),
             'iat' => $now,
             'exp' => $now + self::TOKEN_TTL_SECONDS,
         ];

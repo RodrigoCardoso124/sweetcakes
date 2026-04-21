@@ -129,6 +129,8 @@ class UtilizadorController
 
     private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
     {
+        $cargo = strtolower(trim((string) ($func['cargo'] ?? '')));
+        $isAdmin = in_array($cargo, ['admin', 'administrador', 'administradora'], true);
         return [
             'session_id' => $sessionToken,
             'utilizador' => [
@@ -137,6 +139,7 @@ class UtilizadorController
                 'nome' => $pessoa['nome'],
                 'email' => $pessoa['email'],
                 'funcionario' => $func ?: null,
+                'is_admin' => $isAdmin,
             ],
         ];
     }

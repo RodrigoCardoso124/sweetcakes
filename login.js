@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('adminEmail', email);
                 localStorage.setItem('adminNome', response.utilizador.nome || '');
                 localStorage.setItem('adminFuncionarioId', response.utilizador.funcionario.funcionario_id || '');
+                localStorage.setItem('adminIsAdmin', response.utilizador.is_admin ? 'true' : 'false');
                 if (response.session_id) {
                     localStorage.setItem('apiSessionId', response.session_id);
                 }

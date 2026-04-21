@@ -7,8 +7,17 @@ function clearAdminSession() {
     localStorage.removeItem('adminEmail');
     localStorage.removeItem('adminNome');
     localStorage.removeItem('adminFuncionarioId');
+    localStorage.removeItem('adminIsAdmin');
     localStorage.removeItem('apiSessionId');
   } catch (e) {}
+}
+
+function isCurrentUserAdmin() {
+  try {
+    return localStorage.getItem('adminIsAdmin') === 'true';
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -76,6 +85,22 @@ function requireAdminPageAuth() {
   return true;
 }
 
+function enforcePageRole() {
+  var scope = document.body.getAttribute('data-page-scope') || 'employee';
+  if (scope === 'admin' && !isCurrentUserAdmin()) {
+    window.location.href = 'index.html';
+    return false;
+  }
+  return true;
+}
+
+function applyRoleVisibility() {
+  var isAdmin = isCurrentUserAdmin();
+  document.querySelectorAll('[data-admin-only="true"]').forEach(function (el) {
+    if (!isAdmin) el.style.display = 'none';
+  });
+}
+
 async function bindAdminLogout(buttonId) {
   var btn = document.getElementById(buttonId || 'logoutBtn');
   if (!btn) return;
@@ -137,6 +162,8 @@ function initAdminMobileNav() {
 
 function initAdminShell() {
   if (!requireAdminPageAuth()) return false;
+  if (!enforcePageRole()) return false;
+  applyRoleVisibility();
   initSidebarNavActive();
   bindAdminLogout('logoutBtn');
   initAdminMobileNav();

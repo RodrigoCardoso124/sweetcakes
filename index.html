@@ -6,7 +6,7 @@
     <title>Painel de Administração - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-page-scope="employee">
     <div class="admin-container">
         <!-- Sidebar -->
         <aside class="sidebar" id="admin-sidebar">
@@ -19,19 +19,19 @@
                     <span class="icon">📦</span>
                     <span>Encomendas</span>
                 </a>
-                <a href="clientes.html" class="nav-item">
+                <a href="clientes.html" class="nav-item" data-admin-only="true">
                     <span class="icon">👥</span>
                     <span>Clientes</span>
                 </a>
-                <a href="produtos.html" class="nav-item">
+                <a href="produtos.html" class="nav-item" data-admin-only="true">
                     <span class="icon">🍰</span>
                     <span>Produtos</span>
                 </a>
-                <a href="funcionarios.html" class="nav-item">
+                <a href="funcionarios.html" class="nav-item" data-admin-only="true">
                     <span class="icon">👔</span>
                     <span>Funcionários</span>
                 </a>
-                <a href="estatisticas.html" class="nav-item">
+                <a href="estatisticas.html" class="nav-item" data-admin-only="true">
                     <span class="icon">📊</span>
                     <span>Estatísticas</span>
                 </a>

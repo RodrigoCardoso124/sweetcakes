@@ -3,12 +3,14 @@ let allEncomendas = [];
 let clientesCache = {};
 let currentEncomendasPage = 1;
 const ENCOMENDAS_PER_PAGE = 10;
+let currentUserIsAdmin = false;
 let encomendasFiltradas = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
     if (initAdminShell() === false) return;
   } else if (typeof requireAdminPageAuth === 'function' && !requireAdminPageAuth()) return;
+  currentUserIsAdmin = typeof isCurrentUserAdmin === 'function' ? isCurrentUserAdmin() : false;
 
   loadEncomendas();
   setupEventListeners();
@@ -163,11 +165,13 @@ function renderEncomendas(encomendas) {
         '<a href="encomenda.html?id=' +
         encomenda.encomenda_id +
         '" class="action-btn view">Ver</a>' +
-        '<button type="button" class="action-btn edit" data-eid="' +
-        encomenda.encomenda_id +
-        '" data-estado="' +
-        est +
-        '">Alterar</button>' +
+        (currentUserIsAdmin
+          ? '<button type="button" class="action-btn edit" data-eid="' +
+            encomenda.encomenda_id +
+            '" data-estado="' +
+            est +
+            '">Alterar</button>'
+          : '') +
         '</td>' +
         '</tr>'
       );
@@ -176,11 +180,13 @@ function renderEncomendas(encomendas) {
 
   renderPagination(pagination, currentEncomendasPage, totalPages, 'goToEncomendasPage');
 
-  tbody.querySelectorAll('.action-btn.edit').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      openStatusModal(parseInt(btn.getAttribute('data-eid'), 10), btn.getAttribute('data-estado'));
+  if (currentUserIsAdmin) {
+    tbody.querySelectorAll('.action-btn.edit').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        openStatusModal(parseInt(btn.getAttribute('data-eid'), 10), btn.getAttribute('data-estado'));
+      });
     });
-  });
+  }
 }
 
 function formatStatus(status) {
