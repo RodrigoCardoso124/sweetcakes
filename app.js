@@ -47,7 +47,11 @@ async function loadEncomendas() {
 
   try {
     allEncomendas = await API.getAllEncomendas();
-    await loadClientes();
+    if (currentUserIsAdmin) {
+      await loadClientes();
+    } else {
+      clientesCache = {};
+    }
     encomendasFiltradas = allEncomendas.slice();
     renderEncomendas(encomendasFiltradas);
     updateStats(allEncomendas);
