@@ -305,6 +305,26 @@ if ($resource === 'logout' && $httpMethod === 'POST') {
     exit();
 }
 
+if ($resource === 'session' && $httpMethod === 'GET') {
+    Auth::startSession();
+    $loggedIn = Auth::isLoggedIn();
+    if (!$loggedIn) {
+        http_response_code(401);
+        echo json_encode(['logged_in' => false, 'message' => 'Sessão não ativa']);
+        exit();
+    }
+
+    echo json_encode([
+        'logged_in' => true,
+        'pessoa_id' => Auth::pessoaId(),
+        'utilizador_id' => Auth::utilizadorId(),
+        'funcionario_id' => Auth::funcionarioId(),
+        'is_funcionario' => Auth::isFuncionario(),
+        'is_admin' => Auth::isAdmin(),
+    ]);
+    exit();
+}
+
 if ($resource === null || $resource === '' || !isset($routes[$resource])) {
     http_response_code(404);
     echo json_encode([

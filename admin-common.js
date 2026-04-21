@@ -84,16 +84,35 @@ function showToast(message, type) {
 }
 
 function requireAdminPageAuth() {
-  if (localStorage.getItem('adminLoggedIn') !== 'true') {
-    window.location.href = 'login.html';
-    return false;
-  }
-  if (!localStorage.getItem('adminFuncionarioId')) {
-    clearAdminSession();
+  var hasLoggedFlag = localStorage.getItem('adminLoggedIn') === 'true';
+  var hasApiSession = !!localStorage.getItem('apiSessionId');
+  if (!hasLoggedFlag && !hasApiSession) {
     window.location.href = 'login.html';
     return false;
   }
   return true;
+}
+
+async function syncSessionRoleFromServer() {
+  if (typeof API === 'undefined' || !API.getSessionInfo) return;
+  try {
+    var session = await API.getSessionInfo();
+    if (!session || !session.logged_in) {
+      clearAdminSession();
+      window.location.href = 'login.html';
+      return;
+    }
+    localStorage.setItem('adminLoggedIn', 'true');
+    localStorage.setItem('adminFuncionarioId', String(session.funcionario_id || ''));
+    localStorage.setItem('adminIsAdmin', session.is_admin ? 'true' : 'false');
+    if (!enforcePageRole()) return;
+    applyRoleVisibility();
+  } catch (e) {
+    if (e && e.status === 401) {
+      clearAdminSession();
+      window.location.href = 'login.html';
+    }
+  }
 }
 
 function enforcePageRole() {
@@ -175,6 +194,7 @@ function initAdminShell() {
   if (!requireAdminPageAuth()) return false;
   if (!enforcePageRole()) return false;
   applyRoleVisibility();
+  syncSessionRoleFromServer();
   initSidebarNavActive();
   bindAdminLogout('logoutBtn');
   initAdminMobileNav();

@@ -88,6 +88,10 @@ async function apiRequest(endpoint, method, data) {
 }
 
 const API = {
+  async getSessionInfo() {
+    return apiRequest('session', 'GET');
+  },
+
   async logout() {
     return apiRequest('logout', 'POST', {});
   },
