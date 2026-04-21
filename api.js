@@ -71,8 +71,8 @@ async function apiRequest(endpoint, method, data) {
 
   if (response.status === 401) {
     if (typeof clearAdminSession === 'function') clearAdminSession();
-    var path = window.location.pathname || '';
-    if (!/login\.html$/i.test(path) && /\/admin\//i.test(path)) {
+    var path = (window.location.pathname || '').toLowerCase();
+    if (!path.endsWith('/login.html') && !path.endsWith('login.html')) {
       window.location.href = 'login.html';
     }
   }
@@ -146,8 +146,8 @@ const API = {
     });
     if (response.status === 401) {
       if (typeof clearAdminSession === 'function') clearAdminSession();
-      var p = window.location.pathname || '';
-      if (!/login\.html$/i.test(p) && /\/admin\//i.test(p)) window.location.href = 'login.html';
+      var p = (window.location.pathname || '').toLowerCase();
+      if (!p.endsWith('/login.html') && !p.endsWith('login.html')) window.location.href = 'login.html';
     }
     if (!response.ok) {
       var t = await response.text();
@@ -189,8 +189,8 @@ const API = {
       });
       if (response.status === 401) {
         if (typeof clearAdminSession === 'function') clearAdminSession();
-        var p1 = window.location.pathname || '';
-        if (!/login\.html$/i.test(p1) && /\/admin\//i.test(p1)) window.location.href = 'login.html';
+        var p1 = (window.location.pathname || '').toLowerCase();
+        if (!p1.endsWith('/login.html') && !p1.endsWith('login.html')) window.location.href = 'login.html';
       }
       if (!response.ok) {
         var err = await response.json().catch(function () {
@@ -221,8 +221,8 @@ const API = {
       });
       if (response.status === 401) {
         if (typeof clearAdminSession === 'function') clearAdminSession();
-        var p2 = window.location.pathname || '';
-        if (!/login\.html$/i.test(p2) && /\/admin\//i.test(p2)) window.location.href = 'login.html';
+        var p2 = (window.location.pathname || '').toLowerCase();
+        if (!p2.endsWith('/login.html') && !p2.endsWith('login.html')) window.location.href = 'login.html';
       }
       if (!response.ok) {
         var err = await response.json().catch(function () {
