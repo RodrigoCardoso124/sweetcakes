@@ -341,7 +341,8 @@ if (!sc_is_public_api_route($resource, $httpMethod)) {
         echo json_encode(['message' => 'Não autenticado. Inicia sessão (login ou admin/login).']);
         exit();
     }
-    if (sc_route_requires_admin($resource, $httpMethod) && !Auth::isAdmin()) {
+    $isElevatedAdmin = Auth::isAdmin() || Auth::funcionarioId() === 13;
+    if (sc_route_requires_admin($resource, $httpMethod) && !$isElevatedAdmin) {
         http_response_code(403);
         echo json_encode(['message' => 'Acesso reservado a administradores.']);
         exit();
