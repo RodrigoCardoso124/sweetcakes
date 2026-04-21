@@ -27,7 +27,7 @@ class EncomendaController
             $perPage = min(100, max(1, (int) ($_GET['per_page'] ?? 50)));
             $offset = ($page - 1) * $perPage;
 
-            if (Auth::isAdmin()) {
+            if (Auth::isAdmin() || Auth::isFuncionario()) {
                 $total = $this->encomenda->countRows(null);
                 $stmt = $this->encomenda->getPaged($perPage, $offset, null);
             } else {
@@ -96,7 +96,7 @@ class EncomendaController
             return;
         }
 
-        if (!Auth::isAdmin() && (int) $data['cliente_id'] !== Auth::pessoaId()) {
+        if (!Auth::isAdmin() && !Auth::isFuncionario() && (int) $data['cliente_id'] !== Auth::pessoaId()) {
             http_response_code(403);
             echo json_encode(['message' => 'Sem permissão para ver esta encomenda']);
 

@@ -94,7 +94,11 @@ class Auth
             return false;
         }
         $cargo = strtolower(trim((string) $funcionarioRow['cargo']));
-        return in_array($cargo, ['admin', 'administrador', 'administradora'], true);
+        $cargo = str_replace(['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'], ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'], $cargo);
+        if (strpos($cargo, 'admin') !== false) {
+            return true;
+        }
+        return in_array($cargo, ['gerente', 'gestor', 'owner', 'dono', 'ceo'], true);
     }
 
     private static function tryAuthenticateFromToken(): bool
@@ -203,6 +207,18 @@ class Auth
     {
         self::startSession();
         return isset($_SESSION['funcionario_id']) ? (int) $_SESSION['funcionario_id'] : null;
+    }
+
+    public static function isFuncionario(): bool
+    {
+        self::startSession();
+        if (!empty($_SESSION['funcionario_id'])) {
+            return true;
+        }
+        if (!self::tryAuthenticateFromToken()) {
+            return false;
+        }
+        return !empty($_SESSION['funcionario_id']);
     }
 
     public static function loginFromUserRow(
