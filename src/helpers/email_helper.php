@@ -203,6 +203,8 @@ function enviar_email_verificacao($to, $nome, $verificationUrl)
         $mail->CharSet = 'UTF-8';
 
         $safeNome = trim((string) $nome) !== '' ? trim((string) $nome) : 'cliente';
+        $safeNomeHtml = htmlspecialchars($safeNome, ENT_QUOTES, 'UTF-8');
+        $safeVerificationUrl = htmlspecialchars((string) $verificationUrl, ENT_QUOTES, 'UTF-8');
         $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name'] ?? 'Sweet Cakes');
         if (!empty($mailConfig['reply_to'])) {
             $mail->addReplyTo($mailConfig['reply_to'], $mailConfig['from_name'] ?? 'Sweet Cakes');
@@ -210,8 +212,8 @@ function enviar_email_verificacao($to, $nome, $verificationUrl)
         $mail->addAddress($to);
         $mail->isHTML(true);
         $mail->Subject = 'Sweet Cakes - Confirme o seu email';
-        $mail->Body = "<html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:20px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='margin-top:0;color:#5B25F0;'>Bem-vindo(a), {$safeNome}!</h2><p>Para ativar a sua conta, use o botão abaixo (não precisa de introduzir nenhum código).</p><p style='margin:24px 0;'><a href='{$verificationUrl}' style='background:#5B25F0;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;'>Confirmar email</a></p><p style='font-size:13px;color:#666;'>Se não criou conta na Sweet Cakes, ignore este email.</p></div></body></html>";
-        $mail->AltBody = "Olá {$safeNome},\n\nPara ativar a sua conta, abra este email em HTML e use o botão \"Confirmar email\".\n\nSe não criou conta na Sweet Cakes, ignore este email.\n\n— Equipa Sweet Cakes";
+        $mail->Body = "<html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:20px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='margin-top:0;color:#5B25F0;'>Bem-vindo(a), {$safeNomeHtml}!</h2><p>Para ativar a sua conta, use o botão abaixo (não precisa de introduzir nenhum código).</p><p style='margin:24px 0;'><a href='{$safeVerificationUrl}' style='background:#5B25F0;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;'>Confirmar email</a></p><p style='font-size:13px;color:#666;'>Se não criou conta na Sweet Cakes, ignore este email.</p></div></body></html>";
+        $mail->AltBody = "Olá {$safeNome},\n\nPara ativar a sua conta, use este link:\n{$verificationUrl}\n\nSe não criou conta na Sweet Cakes, ignore este email.\n\n— Equipa Sweet Cakes";
         $mail->send();
 
         sc_email_audit_log('email_verificacao_enviado', ['to' => $to]);
@@ -269,6 +271,8 @@ function enviar_email_reset_password($to, $nome, $resetUrl)
         $mail->CharSet = 'UTF-8';
 
         $safeNome = trim((string) $nome) !== '' ? trim((string) $nome) : 'cliente';
+        $safeNomeHtml = htmlspecialchars($safeNome, ENT_QUOTES, 'UTF-8');
+        $safeResetUrl = htmlspecialchars((string) $resetUrl, ENT_QUOTES, 'UTF-8');
         $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name'] ?? 'Sweet Cakes');
         if (!empty($mailConfig['reply_to'])) {
             $mail->addReplyTo($mailConfig['reply_to'], $mailConfig['from_name'] ?? 'Sweet Cakes');
@@ -276,8 +280,8 @@ function enviar_email_reset_password($to, $nome, $resetUrl)
         $mail->addAddress($to);
         $mail->isHTML(true);
         $mail->Subject = 'Sweet Cakes - Redefinir password';
-        $mail->Body = "<html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:20px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='margin-top:0;color:#5B25F0;'>Olá, {$safeNome}!</h2><p>Recebemos um pedido para redefinir a sua password.</p><p style='margin:24px 0;'><a href='{$resetUrl}' style='background:#5B25F0;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;'>Redefinir password</a></p><p style='font-size:13px;color:#666;'>Se não pediu esta alteração, ignore este email.</p></div></body></html>";
-        $mail->AltBody = "Olá {$safeNome},\n\nPara redefinir a password, abra este email em HTML e use o botão \"Redefinir password\".\n\nSe não pediu esta alteração, ignore este email.\n\n— Equipa Sweet Cakes";
+        $mail->Body = "<html><body style='font-family:Arial,sans-serif;background:#faf7ff;padding:20px;'><div style='max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:24px;'><h2 style='margin-top:0;color:#5B25F0;'>Olá, {$safeNomeHtml}!</h2><p>Recebemos um pedido para redefinir a sua password.</p><p style='margin:24px 0;'><a href='{$safeResetUrl}' style='background:#5B25F0;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;'>Redefinir password</a></p><p style='font-size:13px;color:#666;'>Se não pediu esta alteração, ignore este email.</p></div></body></html>";
+        $mail->AltBody = "Olá {$safeNome},\n\nPara redefinir a password, use este link:\n{$resetUrl}\n\nSe não pediu esta alteração, ignore este email.\n\n— Equipa Sweet Cakes";
         $mail->send();
 
         sc_email_audit_log('email_reset_enviado', ['to' => $to]);

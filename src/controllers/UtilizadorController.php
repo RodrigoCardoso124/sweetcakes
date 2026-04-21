@@ -364,6 +364,12 @@ class UtilizadorController
     public function resetPassword($data): void
     {
         $this->ensurePasswordResetSchema();
+        if (!is_array($data)) {
+            $data = [];
+        }
+        if (!isset($data['email']) && isset($_POST['email'])) {
+            $data['email'] = $_POST['email'];
+        }
         if (!isset($data['email'])) {
             http_response_code(400);
             echo json_encode(['message' => 'email é obrigatório']);
@@ -399,10 +405,19 @@ class UtilizadorController
             $resetUrl
         );
 
+        if (!$emailSent) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Não foi possível enviar o email de redefinição. Tenta novamente em instantes.',
+            ]);
+            return;
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Se o email existir, enviámos um link para redefinir a password',
-            'email_sent' => $emailSent,
+            'email_sent' => true,
         ]);
     }
 
