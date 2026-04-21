@@ -36,15 +36,19 @@ class Encomenda {
 
     public function getPaged(int $limit, int $offset, ?int $clienteId = null) {
         if ($clienteId !== null) {
-            $query = "SELECT * FROM {$this->table}
-                      WHERE cliente_id = :cid
+            $query = "SELECT e.*, p.nome AS cliente_nome, p.email AS cliente_email
+                      FROM {$this->table} e
+                      LEFT JOIN pessoas p ON p.pessoa_id = e.cliente_id
+                      WHERE e.cliente_id = :cid
                       ORDER BY encomenda_id DESC
                       LIMIT :lim OFFSET :off";
             $stmt = $this->conn->prepare($query);
             $stmt->bindValue(":cid", $clienteId, PDO::PARAM_INT);
         } else {
-            $query = "SELECT * FROM {$this->table}
-                      ORDER BY encomenda_id DESC
+            $query = "SELECT e.*, p.nome AS cliente_nome, p.email AS cliente_email
+                      FROM {$this->table} e
+                      LEFT JOIN pessoas p ON p.pessoa_id = e.cliente_id
+                      ORDER BY e.encomenda_id DESC
                       LIMIT :lim OFFSET :off";
             $stmt = $this->conn->prepare($query);
         }
@@ -55,8 +59,10 @@ class Encomenda {
     }
 
     public function getById() {
-        $query = "SELECT * FROM {$this->table}
-                  WHERE encomenda_id = :id LIMIT 1";
+        $query = "SELECT e.*, p.nome AS cliente_nome, p.email AS cliente_email
+                  FROM {$this->table} e
+                  LEFT JOIN pessoas p ON p.pessoa_id = e.cliente_id
+                  WHERE e.encomenda_id = :id LIMIT 1";
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":id", $this->encomenda_id);
         $stmt->execute();

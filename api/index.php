@@ -208,7 +208,7 @@ function sc_route_requires_admin(?string $resource, string $method): bool
     if ($resource === 'produtos' && $method !== 'GET') {
         return true;
     }
-    if ($resource === 'encomendas' && in_array($method, ['PUT', 'DELETE'], true)) {
+    if ($resource === 'encomendas' && $method === 'DELETE') {
         return true;
     }
     if ($resource === 'encomenda_detalhes') {

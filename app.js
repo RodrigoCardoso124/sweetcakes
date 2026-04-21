@@ -4,6 +4,7 @@ let clientesCache = {};
 let currentEncomendasPage = 1;
 const ENCOMENDAS_PER_PAGE = 10;
 let currentUserIsAdmin = false;
+let currentUserCanManageOrders = false;
 let encomendasFiltradas = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (initAdminShell() === false) return;
   } else if (typeof requireAdminPageAuth === 'function' && !requireAdminPageAuth()) return;
   currentUserIsAdmin = typeof isCurrentUserAdmin === 'function' ? isCurrentUserAdmin() : false;
+  currentUserCanManageOrders = currentUserIsAdmin || !!localStorage.getItem('adminFuncionarioId');
 
   loadEncomendas();
   setupEventListeners();
@@ -47,11 +49,7 @@ async function loadEncomendas() {
 
   try {
     allEncomendas = await API.getAllEncomendas();
-    if (currentUserIsAdmin) {
-      await loadClientes();
-    } else {
-      clientesCache = {};
-    }
+    clientesCache = {};
     encomendasFiltradas = allEncomendas.slice();
     renderEncomendas(encomendasFiltradas);
     updateStats(allEncomendas);
@@ -96,8 +94,8 @@ function exportEncomendasCsv() {
   var lines = [headers.join(';')];
   rows.forEach((encomenda) => {
     var cliente = clientesCache[encomenda.cliente_id] || {};
-    var nome = (cliente.nome || '').replace(/"/g, '""');
-    var email = (cliente.email || '').replace(/"/g, '""');
+    var nome = (encomenda.cliente_nome || cliente.nome || '').replace(/"/g, '""');
+    var email = (encomenda.cliente_email || cliente.email || '').replace(/"/g, '""');
     lines.push(
       [
         encomenda.encomenda_id,
@@ -137,8 +135,8 @@ function renderEncomendas(encomendas) {
   tbody.innerHTML = pageItems
     .map((encomenda) => {
       var cliente = clientesCache[encomenda.cliente_id] || {
-        nome: 'Cliente #' + encomenda.cliente_id,
-        email: 'N/A'
+        nome: encomenda.cliente_nome || ('Cliente #' + encomenda.cliente_id),
+        email: encomenda.cliente_email || 'N/A'
       };
       var statusClass = encomenda.estado ? encomenda.estado.replace('_', '-') : 'pendente';
       var statusText = formatStatus(encomenda.estado);
@@ -150,9 +148,9 @@ function renderEncomendas(encomendas) {
         encomenda.encomenda_id +
         '</strong></td>' +
         '<td><div>' +
-        (cliente.nome || 'N/A') +
+        (encomenda.cliente_nome || cliente.nome || 'N/A') +
         '</div><small style="color: #666;">' +
-        (cliente.email || '') +
+        (encomenda.cliente_email || cliente.email || '') +
         '</small></td>' +
         '<td><strong>€' +
         parseFloat(encomenda.total || 0).toFixed(2) +
@@ -169,7 +167,7 @@ function renderEncomendas(encomendas) {
         '<a href="encomenda.html?id=' +
         encomenda.encomenda_id +
         '" class="action-btn view">Ver</a>' +
-        (currentUserIsAdmin
+        (currentUserCanManageOrders
           ? '<button type="button" class="action-btn edit" data-eid="' +
             encomenda.encomenda_id +
             '" data-estado="' +
@@ -184,7 +182,7 @@ function renderEncomendas(encomendas) {
 
   renderPagination(pagination, currentEncomendasPage, totalPages, 'goToEncomendasPage');
 
-  if (currentUserIsAdmin) {
+  if (currentUserCanManageOrders) {
     tbody.querySelectorAll('.action-btn.edit').forEach((btn) => {
       btn.addEventListener('click', () => {
         openStatusModal(parseInt(btn.getAttribute('data-eid'), 10), btn.getAttribute('data-estado'));

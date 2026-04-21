@@ -2,12 +2,14 @@
 let currentEncomendaId = null;
 let produtosCache = {};
 let currentUserIsAdmin = false;
+let currentUserCanManageOrders = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
     if (initAdminShell() === false) return;
   } else if (typeof requireAdminPageAuth === 'function' && !requireAdminPageAuth()) return;
   currentUserIsAdmin = typeof isCurrentUserAdmin === 'function' ? isCurrentUserAdmin() : false;
+  currentUserCanManageOrders = currentUserIsAdmin || !!localStorage.getItem('adminFuncionarioId');
 
   const urlParams = new URLSearchParams(window.location.search);
   currentEncomendaId = urlParams.get('id');
@@ -98,7 +100,7 @@ function displayEncomenda(encomenda, cliente, detalhes) {
   }
 
   const statusActions = document.querySelector('.actions-card');
-  if (currentUserIsAdmin) {
+  if (currentUserCanManageOrders) {
     document.getElementById('statusSelect').value = encomenda.estado || 'pendente';
     if (statusActions) statusActions.style.display = 'block';
   } else {
@@ -154,7 +156,7 @@ function formatStatus(status) {
 }
 
 async function updateStatus() {
-  if (!currentUserIsAdmin) return;
+  if (!currentUserCanManageOrders) return;
   const newStatus = document.getElementById('statusSelect').value;
   const btn = document.getElementById('updateStatusBtn');
 
