@@ -1,11 +1,13 @@
 // Página de detalhe de encomenda
 let currentEncomendaId = null;
 let produtosCache = {};
+let currentUserIsAdmin = false;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
     if (initAdminShell() === false) return;
   } else if (typeof requireAdminPageAuth === 'function' && !requireAdminPageAuth()) return;
+  currentUserIsAdmin = typeof isCurrentUserAdmin === 'function' ? isCurrentUserAdmin() : false;
 
   const urlParams = new URLSearchParams(window.location.search);
   currentEncomendaId = urlParams.get('id');
@@ -48,10 +50,12 @@ async function loadEncomendaDetails() {
     const encomenda = await API.getEncomenda(currentEncomendaId);
 
     let cliente = null;
-    try {
-      cliente = await API.getPessoa(encomenda.cliente_id);
-    } catch (err) {
-      console.error('Error loading cliente:', err);
+    if (currentUserIsAdmin) {
+      try {
+        cliente = await API.getPessoa(encomenda.cliente_id);
+      } catch (err) {
+        console.error('Error loading cliente:', err);
+      }
     }
 
     let detalhes = [];
@@ -93,7 +97,13 @@ function displayEncomenda(encomenda, cliente, detalhes) {
     document.getElementById('clientCard').style.display = 'none';
   }
 
-  document.getElementById('statusSelect').value = encomenda.estado || 'pendente';
+  const statusActions = document.querySelector('.actions-card');
+  if (currentUserIsAdmin) {
+    document.getElementById('statusSelect').value = encomenda.estado || 'pendente';
+    if (statusActions) statusActions.style.display = 'block';
+  } else {
+    if (statusActions) statusActions.style.display = 'none';
+  }
 
   displayProducts(detalhes);
 }
@@ -144,6 +154,7 @@ function formatStatus(status) {
 }
 
 async function updateStatus() {
+  if (!currentUserIsAdmin) return;
   const newStatus = document.getElementById('statusSelect').value;
   const btn = document.getElementById('updateStatusBtn');
 
