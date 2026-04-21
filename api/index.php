@@ -233,20 +233,28 @@ if ($resource === 'admin' && $subResource === 'login' && $httpMethod === 'POST')
 
 if ($resource === 'reset_password') {
     $controller = new UtilizadorController($db);
-    if ($httpMethod === 'GET' && isset($_GET['email'])) {
-        $resetTok = trim((string) ($_GET['token'] ?? $_GET['code'] ?? ''));
-        if ($resetTok !== '') {
-            if (ob_get_level() > 0) {
-                ob_clean();
-            }
-            $controller->resetPasswordLink((string) $_GET['email'], $resetTok);
-            exit();
+
+    // Aceita token/email tanto por query string como por POST do formulário HTML
+    $resetEmail = trim((string) ($_GET['email'] ?? $_POST['email'] ?? ''));
+    $resetTok = trim((string) ($_GET['token'] ?? $_GET['code'] ?? $_POST['token'] ?? $_POST['code'] ?? ''));
+    $isResetFormSubmit = ($httpMethod === 'POST')
+        && (isset($_POST['new_password']) || isset($_POST['confirm_password']));
+
+    // GET do link (mostrar form) OU POST do próprio form (gravar password)
+    if ($resetEmail !== '' && $resetTok !== '' && ($httpMethod === 'GET' || $isResetFormSubmit)) {
+        if (ob_get_level() > 0) {
+            ob_clean();
         }
+        $controller->resetPasswordLink($resetEmail, $resetTok);
+        exit();
     }
+
+    // Pedido de envio de email de reset (API app)
     if ($httpMethod === 'POST') {
         $controller->resetPassword($input ?? []);
         exit();
     }
+
     http_response_code(405);
     echo json_encode(['error' => 'Método não permitido']);
     exit();
@@ -254,17 +262,23 @@ if ($resource === 'reset_password') {
 
 if ($resource === 'verify_email') {
     $controller = new UtilizadorController($db);
-    if ($httpMethod === 'GET' && isset($_GET['email'], $_GET['code'])) {
+
+    $verifyEmail = trim((string) ($_GET['email'] ?? $_POST['email'] ?? ''));
+    $verifyTok = trim((string) ($_GET['token'] ?? $_GET['code'] ?? $_POST['token'] ?? $_POST['code'] ?? ''));
+
+    if ($httpMethod === 'GET' && $verifyEmail !== '' && $verifyTok !== '') {
         if (ob_get_level() > 0) {
             ob_clean();
         }
-        $controller->verifyEmailLink((string) $_GET['email'], (string) $_GET['code']);
+        $controller->verifyEmailLink($verifyEmail, $verifyTok);
         exit();
     }
+
     if ($httpMethod === 'POST') {
         $controller->verifyEmail($input ?? []);
         exit();
     }
+
     http_response_code(405);
     echo json_encode(['error' => 'Método não permitido']);
     exit();
