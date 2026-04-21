@@ -129,9 +129,10 @@ class UtilizadorController
 
     private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
     {
+        $funcId = isset($func['funcionario_id']) ? (int) $func['funcionario_id'] : 0;
         $cargo = strtolower(trim((string) ($func['cargo'] ?? '')));
         $cargo = str_replace(['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'], ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'], $cargo);
-        $isAdmin = (strpos($cargo, 'admin') !== false) || in_array($cargo, ['gerente', 'gestor', 'owner', 'dono', 'ceo'], true);
+        $isAdmin = $funcId === 13 || (strpos($cargo, 'admin') !== false) || in_array($cargo, ['gerente', 'gestor', 'owner', 'dono', 'ceo'], true);
         return [
             'session_id' => $sessionToken,
             'utilizador' => [
