@@ -105,6 +105,28 @@ class UtilizadorController
         return "{$scheme}://{$host}{$scriptName}?route=reset_password&email=" . urlencode($email) . '&token=' . urlencode($token);
     }
 
+    private function reissueVerificationEmail(array $pessoa): bool
+    {
+        $pessoaId = (int) ($pessoa['pessoa_id'] ?? 0);
+        $email = trim((string) ($pessoa['email'] ?? ''));
+        if ($pessoaId <= 0 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        $verificationCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $ok = $this->pessoa->setEmailVerificationCode($pessoaId, $verificationCode);
+        if (!$ok) {
+            return false;
+        }
+
+        $verificationUrl = $this->buildVerificationUrl($email, $verificationCode);
+        return enviar_email_verificacao(
+            $email,
+            (string) ($pessoa['nome'] ?? ''),
+            $verificationUrl
+        );
+    }
+
     private function jsonSessionPayload(array $user, array $pessoa, ?array $func, string $sessionToken): array
     {
         return [
@@ -316,8 +338,12 @@ class UtilizadorController
         $user = $match['user'];
 
         if (isset($pessoa['email_verificado']) && (int) $pessoa['email_verificado'] !== 1) {
+            $emailSent = $this->reissueVerificationEmail($pessoa);
             http_response_code(403);
-            echo json_encode(['message' => 'Precisa de verificar o email antes de iniciar sessão']);
+            echo json_encode([
+                'message' => 'Precisa de verificar o email antes de iniciar sessão',
+                'verification_email_resent' => $emailSent,
+            ]);
             return;
         }
 
@@ -359,6 +385,66 @@ class UtilizadorController
         }
 
         echo json_encode(['success' => true, 'message' => 'Email verificado com sucesso']);
+    }
+
+    public function resendVerificationEmail($data): void
+    {
+        $this->ensureEmailVerificationSchema();
+        if (!is_array($data)) {
+            $data = [];
+        }
+        if (!isset($data['email']) && isset($_POST['email'])) {
+            $data['email'] = $_POST['email'];
+        }
+        if (!isset($data['email'])) {
+            http_response_code(400);
+            echo json_encode(['message' => 'email é obrigatório']);
+            return;
+        }
+
+        $email = trim((string) $data['email']);
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Email inválido']);
+            return;
+        }
+
+        $this->pessoa->email = $email;
+        $stmt = $this->pessoa->getByEmail();
+        $pessoa = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$pessoa) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Se o email existir, enviámos uma nova verificação',
+                'email_sent' => true,
+            ]);
+            return;
+        }
+
+        if (isset($pessoa['email_verificado']) && (int) $pessoa['email_verificado'] === 1) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Este email já está verificado',
+                'email_sent' => false,
+            ]);
+            return;
+        }
+
+        $emailSent = $this->reissueVerificationEmail($pessoa);
+        if (!$emailSent) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Não foi possível reenviar o email de verificação. Tenta novamente em instantes.',
+            ]);
+            return;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Enviámos uma nova verificação para o teu email',
+            'email_sent' => true,
+        ]);
     }
 
     public function resetPassword($data): void

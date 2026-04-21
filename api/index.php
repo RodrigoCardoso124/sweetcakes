@@ -187,6 +187,9 @@ function sc_is_public_api_route(?string $resource, string $method): bool
     if ($resource === 'verify_email' && in_array($method, ['GET', 'POST'], true)) {
         return true;
     }
+    if ($resource === 'resend_verification_email' && $method === 'POST') {
+        return true;
+    }
     if ($resource === 'reset_password' && in_array($method, ['GET', 'POST'], true)) {
         return true;
     }
@@ -279,6 +282,17 @@ if ($resource === 'verify_email') {
         exit();
     }
 
+    http_response_code(405);
+    echo json_encode(['error' => 'Método não permitido']);
+    exit();
+}
+
+if ($resource === 'resend_verification_email') {
+    $controller = new UtilizadorController($db);
+    if ($httpMethod === 'POST') {
+        $controller->resendVerificationEmail($input ?? []);
+        exit();
+    }
     http_response_code(405);
     echo json_encode(['error' => 'Método não permitido']);
     exit();
