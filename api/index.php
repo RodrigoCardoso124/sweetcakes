@@ -348,7 +348,6 @@ if (!sc_is_public_api_route($resource, $httpMethod)) {
         exit();
     }
 }
-
 try {
     $controllerName = $routes[$resource];
     $controller = new $controllerName($db);
