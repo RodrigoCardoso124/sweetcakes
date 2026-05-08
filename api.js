@@ -1,277 +1,278 @@
-// API: base dinâmica (XAMPP em subpastas ou raiz) + sessão (cookies + X-Session-Id para apps)
-const API_DEBUG = false;
-
+// API Configuration: em localhost usa o path do XAMPP; no servidor usa /index.php
 const API_BASE_URL = (function () {
   if (typeof window.API_BASE_URL !== 'undefined') return window.API_BASE_URL;
-  return window.location.origin + '/api/index.php';
+  var isLocal = /^localhost$|^127\.0\.0\.1$/i.test(window.location.hostname);
+  return isLocal
+    ? window.location.origin + '/pap_flutter/sweet_cakes_api/public/index.php'
+    : window.location.origin + '/index.php';
 })();
 
-const PUBLIC_BASE_URL = (function () {
-  if (typeof window.PUBLIC_BASE_URL !== 'undefined') return window.PUBLIC_BASE_URL;
-  return window.location.origin;
-})();
+// Helper function to make API requests
+async function apiRequest(endpoint, method = 'GET', data = null) {
+    const url = `${API_BASE_URL}/${endpoint}`;
+    const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    };
 
-function getProdutoImageUrl(imagemPath) {
-  if (!imagemPath) return null;
-  if (/^https?:\/\//i.test(imagemPath)) return imagemPath;
-  var base = PUBLIC_BASE_URL.replace(/\/$/, '');
-  return base + '/api/image.php?path=' + encodeURIComponent(imagemPath);
-}
-
-function apiSessionHeaders() {
-  var sid = localStorage.getItem('apiSessionId');
-  var h = {};
-  if (sid) h['X-Session-Id'] = sid;
-  return h;
-}
-
-function buildApiUrl(endpoint) {
-  var e = (endpoint || '').replace(/^\//, '');
-  var qPos = e.indexOf('?');
-  var route = qPos === -1 ? e : e.substring(0, qPos);
-  var query = qPos === -1 ? '' : e.substring(qPos + 1);
-  var url = API_BASE_URL + '?route=' + encodeURIComponent(route);
-  if (query) url += '&' + query;
-  return url;
-}
-
-async function apiRequest(endpoint, method, data) {
-  method = method || 'GET';
-  if (window.location.protocol === 'file:') {
-    throw new Error(
-      'Aplicação aberta em file://. Abre pelo servidor web (ex.: http://localhost/.../admin/login.html).'
-    );
-  }
-  var url = buildApiUrl(endpoint);
-  var headers = Object.assign({ Accept: 'application/json' }, apiSessionHeaders());
-  var options = {
-    method: method,
-    credentials: 'include',
-    headers: headers
-  };
-
-  if (data !== undefined && data !== null && (method === 'POST' || method === 'PUT')) {
-    headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(data);
-  }
-
-  if (API_DEBUG) console.log('[API]', method, url, data || '');
-
-  var response = await fetch(url, options);
-  var responseText = await response.text();
-  var result;
-  try {
-    result = JSON.parse(responseText);
-  } catch (e) {
-    var err = new Error('Resposta inválida do servidor (não é JSON).');
-    err.status = response.status;
-    err.response = { raw: responseText };
-    throw err;
-  }
-
-  if (response.status === 401) {
-    if (typeof clearAdminSession === 'function') clearAdminSession();
-    var path = (window.location.pathname || '').toLowerCase();
-    if (!path.endsWith('/login.html') && !path.endsWith('login.html')) {
-      window.location.href = 'login.html';
+    // Anexa Bearer token se houver sessao admin guardada (necessario para
+    // todos os endpoints protegidos: pessoas, encomendas, funcionarios, etc).
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
     }
-  }
 
-  if (!response.ok) {
-    var error = new Error(result.message || 'Erro ' + response.status);
-    error.status = response.status;
-    error.response = result;
-    throw error;
-  }
+    const options = { method, headers };
 
-  return result;
+    if (data && (method === 'POST' || method === 'PUT')) {
+        options.body = JSON.stringify(data);
+    }
+
+    try {
+        console.log(`🌐 [API] ${method} ${url}`, data ? { data } : '');
+        const response = await fetch(url, options);
+        
+        // Get response text first to debug
+        const responseText = await response.text();
+        console.log(`📥 [API] Status: ${response.status} ${response.statusText}`);
+        console.log(`📥 [API] Response body:`, responseText);
+        
+        // Try to parse JSON response
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (e) {
+            // If response is not JSON, log the actual response
+            console.error('❌ [API] Resposta não é JSON válido!');
+            console.error('❌ [API] Status:', response.status, response.statusText);
+            console.error('❌ [API] Response Text (primeiros 500 chars):', responseText.substring(0, 500));
+            console.error('❌ [API] Response Text (completo):', responseText);
+            console.error('❌ [API] Erro ao fazer parse:', e);
+            
+            // Create error with actual response text
+            const error = new Error(`Resposta do servidor não é JSON válido. Status: ${response.status}. Resposta: ${responseText.substring(0, 200)}`);
+            error.status = response.status;
+            error.response = { 
+                message: 'Erro ao processar resposta do servidor',
+                raw: responseText,
+                status: response.status,
+                statusText: response.statusText
+            };
+            throw error;
+        }
+        
+        if (!response.ok) {
+            // Create error with message from API
+            const error = new Error(result.message || `Erro ${response.status}: ${response.statusText}`);
+            error.status = response.status;
+            error.response = result;
+            console.error('❌ [API] Erro na resposta:', result);
+            throw error;
+        }
+        
+        console.log('✅ [API] Sucesso:', result);
+        return result;
+    } catch (error) {
+        // If it's already our custom error, re-throw it
+        if (error.message && error.status) {
+            throw error;
+        }
+        // Otherwise, wrap it
+        console.error('❌ [API] Erro na requisição:', error);
+        throw new Error(error.message || 'Erro ao comunicar com o servidor');
+    }
 }
 
+// API Functions
 const API = {
-  async getSessionInfo() {
-    return apiRequest('session', 'GET');
-  },
+    // Admin Login (only for funcionarios)
+    async adminLogin(email, password) {
+        return apiRequest('admin/login', 'POST', { email, password });
+    },
 
-  async logout() {
-    return apiRequest('logout', 'POST', {});
-  },
+    // Regular Login (for app)
+    async login(email, password) {
+        return apiRequest('login', 'POST', { email, password });
+    },
 
-  async adminLogin(email, password) {
-    return apiRequest('admin/login', 'POST', { email: email, password: password });
-  },
+    // Encomendas
+    async getEncomendas() {
+        return apiRequest('encomendas');
+    },
 
-  async login(email, password) {
-    return apiRequest('login', 'POST', { email: email, password: password });
-  },
+    async getEncomenda(id) {
+        return apiRequest(`encomendas/${id}`);
+    },
 
-  async getEncomendas(page, perPage) {
-    page = page || 1;
-    perPage = perPage || 50;
-    return apiRequest('encomendas?page=' + encodeURIComponent(page) + '&per_page=' + encodeURIComponent(perPage), 'GET');
-  },
+    async updateEncomenda(id, data) {
+        return apiRequest(`encomendas/${id}`, 'PUT', data);
+    },
 
-  /** Lista todas as encomendas (várias páginas) — para estatísticas / export */
-  async getAllEncomendas() {
-    var all = [];
-    var page = 1;
-    var totalPages = 1;
-    do {
-      var res = await this.getEncomendas(page, 100);
-      var chunk = res.data || [];
-      all = all.concat(chunk);
-      totalPages = res.total_pages || 1;
-      page++;
-    } while (page <= totalPages);
-    return all;
-  },
+    async deleteEncomenda(id) {
+        return apiRequest(`encomendas/${id}`, 'DELETE');
+    },
 
-  async getEncomenda(id) {
-    return apiRequest('encomendas/' + encodeURIComponent(id), 'GET');
-  },
+    // Encomenda Detalhes
+    async getEncomendaDetalhes(encomendaId) {
+        try {
+            const url = `${API_BASE_URL}/encomenda_detalhes?encomenda_id=${encomendaId}`;
+            const token = localStorage.getItem('adminToken');
+            const headers = { 'Accept': 'application/json' };
+            if (token) headers['Authorization'] = 'Bearer ' + token;
 
-  async updateEncomenda(id, data) {
-    return apiRequest('encomendas/' + encodeURIComponent(id), 'PUT', data);
-  },
+            const response = await fetch(url, {
+                method: 'GET',
+                headers
+            });
+            
+            console.log('📥 Resposta status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Erro na resposta:', errorText);
+                throw new Error(`Erro ao buscar detalhes: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('✅ Detalhes recebidos:', data);
+            return data;
+        } catch (error) {
+            console.error('❌ Error fetching detalhes:', error);
+            // Fallback: try to get all and filter
+            try {
+                console.log('🔄 Tentando fallback: buscar todos os detalhes...');
+                const allDetalhes = await apiRequest('encomenda_detalhes');
+                if (Array.isArray(allDetalhes)) {
+                    const filtered = allDetalhes.filter(d => d.encomenda_id == encomendaId);
+                    console.log('✅ Fallback funcionou, detalhes filtrados:', filtered);
+                    return filtered;
+                }
+            } catch (fallbackError) {
+                console.error('❌ Fallback also failed:', fallbackError);
+            }
+            return [];
+        }
+    },
 
-  async deleteEncomenda(id) {
-    return apiRequest('encomendas/' + encodeURIComponent(id), 'DELETE');
-  },
+    // Pessoas (Clientes)
+    async getPessoa(id) {
+        return apiRequest(`pessoas/${id}`);
+    },
 
-  async getEncomendaDetalhes(encomendaId) {
-    var url = buildApiUrl('encomenda_detalhes?encomenda_id=' + encodeURIComponent(encomendaId));
-    var response = await fetch(url, {
-      method: 'GET',
-      credentials: 'include',
-      headers: Object.assign({ Accept: 'application/json' }, apiSessionHeaders())
-    });
-    if (response.status === 401) {
-      if (typeof clearAdminSession === 'function') clearAdminSession();
-      var p = (window.location.pathname || '').toLowerCase();
-      if (!p.endsWith('/login.html') && !p.endsWith('login.html')) window.location.href = 'login.html';
+    async getPessoas() {
+        return apiRequest('pessoas');
+    },
+
+    // Produtos
+    async getProduto(id) {
+        return apiRequest(`produtos/${id}`);
+    },
+
+    async getProdutos() {
+        return apiRequest('produtos');
+    },
+
+    async createProduto(data, imageFile = null) {
+        if (imageFile) {
+            const formData = new FormData();
+            formData.append('nome', data.nome);
+            formData.append('descricao', data.descricao);
+            formData.append('preco', data.preco);
+            formData.append('disponivel', data.disponivel || 1);
+            formData.append('imagem', imageFile);
+
+            const token = localStorage.getItem('adminToken');
+            const headers = {};
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+
+            const response = await fetch(`${API_BASE_URL}/produtos`, {
+                method: 'POST',
+                headers,
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Erro ao criar produto');
+            }
+
+            return await response.json();
+        } else {
+            return apiRequest('produtos', 'POST', data);
+        }
+    },
+
+    async updateProduto(id, data, imageFile = null) {
+        if (imageFile) {
+            const formData = new FormData();
+            if (data.nome) formData.append('nome', data.nome);
+            if (data.descricao) formData.append('descricao', data.descricao);
+            if (data.preco) formData.append('preco', data.preco);
+            if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
+            formData.append('imagem', imageFile);
+
+            const token = localStorage.getItem('adminToken');
+            const headers = {};
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+
+            const response = await fetch(`${API_BASE_URL}/produtos/${id}`, {
+                method: 'PUT',
+                headers,
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Erro ao atualizar produto');
+            }
+
+            return await response.json();
+        } else {
+            return apiRequest(`produtos/${id}`, 'PUT', data);
+        }
+    },
+
+    async deleteProduto(id) {
+        return apiRequest(`produtos/${id}`, 'DELETE');
+    },
+
+    // Funcionários
+    async getFuncionarios() {
+        return apiRequest('funcionarios');
+    },
+
+    async getFuncionario(id) {
+        return apiRequest(`funcionarios/${id}`);
+    },
+
+    async createFuncionario(data) {
+        return apiRequest('funcionarios', 'POST', data);
+    },
+
+    async updateFuncionario(id, data) {
+        return apiRequest(`funcionarios/${id}`, 'PUT', data);
+    },
+
+    async deleteFuncionario(id) {
+        return apiRequest(`funcionarios/${id}`, 'DELETE');
+    },
+
+    // Clientes (Pessoas)
+    async createCliente(data) {
+        return apiRequest('pessoas', 'POST', data);
+    },
+
+    async updateCliente(id, data) {
+        return apiRequest(`pessoas/${id}`, 'PUT', data);
+    },
+
+    async deleteCliente(id) {
+        return apiRequest(`pessoas/${id}`, 'DELETE');
     }
-    if (!response.ok) {
-      var t = await response.text();
-      throw new Error('Erro ao buscar detalhes: ' + response.status + ' ' + t.substring(0, 120));
-    }
-    return response.json();
-  },
-
-  async getPessoa(id) {
-    return apiRequest('pessoas/' + encodeURIComponent(id), 'GET');
-  },
-
-  async getPessoas() {
-    return apiRequest('pessoas', 'GET');
-  },
-
-  async getProduto(id) {
-    return apiRequest('produtos/' + encodeURIComponent(id), 'GET');
-  },
-
-  async getProdutos() {
-    return apiRequest('produtos', 'GET');
-  },
-
-  async createProduto(data, imageFile) {
-    if (imageFile) {
-      var formData = new FormData();
-      formData.append('nome', data.nome);
-      formData.append('descricao', data.descricao);
-      formData.append('preco', data.preco);
-      formData.append('disponivel', data.disponivel || 1);
-      formData.append('alergenios', data.alergenios || '');
-      formData.append('imagem', imageFile);
-      var response = await fetch(buildApiUrl('produtos'), {
-        method: 'POST',
-        credentials: 'include',
-        headers: apiSessionHeaders(),
-        body: formData
-      });
-      if (response.status === 401) {
-        if (typeof clearAdminSession === 'function') clearAdminSession();
-        var p1 = (window.location.pathname || '').toLowerCase();
-        if (!p1.endsWith('/login.html') && !p1.endsWith('login.html')) window.location.href = 'login.html';
-      }
-      if (!response.ok) {
-        var err = await response.json().catch(function () {
-          return {};
-        });
-        throw new Error(err.message || 'Erro ao criar produto');
-      }
-      return response.json();
-    }
-    return apiRequest('produtos', 'POST', data);
-  },
-
-  async updateProduto(id, data, imageFile) {
-    if (imageFile) {
-      var formData = new FormData();
-      if (data.nome) formData.append('nome', data.nome);
-      if (data.descricao) formData.append('descricao', data.descricao);
-      if (data.preco) formData.append('preco', data.preco);
-      if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
-      if (data.alergenios !== undefined) formData.append('alergenios', data.alergenios);
-      formData.append('_method', 'PUT');
-      formData.append('imagem', imageFile);
-      var response = await fetch(buildApiUrl('produtos/' + encodeURIComponent(id)), {
-        method: 'POST',
-        credentials: 'include',
-        headers: apiSessionHeaders(),
-        body: formData
-      });
-      if (response.status === 401) {
-        if (typeof clearAdminSession === 'function') clearAdminSession();
-        var p2 = (window.location.pathname || '').toLowerCase();
-        if (!p2.endsWith('/login.html') && !p2.endsWith('login.html')) window.location.href = 'login.html';
-      }
-      if (!response.ok) {
-        var err = await response.json().catch(function () {
-          return {};
-        });
-        throw new Error(err.message || 'Erro ao atualizar produto');
-      }
-      return response.json();
-    }
-    return apiRequest('produtos/' + encodeURIComponent(id), 'PUT', data);
-  },
-
-  async deleteProduto(id) {
-    return apiRequest('produtos/' + encodeURIComponent(id), 'DELETE');
-  },
-
-  async getFuncionarios() {
-    return apiRequest('funcionarios', 'GET');
-  },
-
-  async getFuncionario(id) {
-    return apiRequest('funcionarios/' + encodeURIComponent(id), 'GET');
-  },
-
-  async createFuncionario(data) {
-    return apiRequest('funcionarios', 'POST', data);
-  },
-
-  async updateFuncionario(id, data) {
-    return apiRequest('funcionarios/' + encodeURIComponent(id), 'PUT', data);
-  },
-
-  async deleteFuncionario(id) {
-    return apiRequest('funcionarios/' + encodeURIComponent(id), 'DELETE');
-  },
-
-  async createCliente(data) {
-    return apiRequest('pessoas', 'POST', data);
-  },
-
-  async updateCliente(id, data) {
-    return apiRequest('pessoas/' + encodeURIComponent(id), 'PUT', data);
-  },
-
-  async deleteCliente(id) {
-    return apiRequest('pessoas/' + encodeURIComponent(id), 'DELETE');
-  }
 };
 
+// Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = API;
+    module.exports = API;
 }
+

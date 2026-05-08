@@ -25,17 +25,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Use admin login endpoint which only accepts funcionarios
             const response = await API.adminLogin(email, password);
             
-            // Check if login was successful
             if (response.success && response.utilizador && response.utilizador.funcionario) {
-                const funcionarioId = String(response.utilizador.funcionario.funcionario_id || '');
-                const isAdmin = !!response.utilizador.is_admin || funcionarioId === '13';
                 localStorage.setItem('adminLoggedIn', 'true');
                 localStorage.setItem('adminEmail', email);
                 localStorage.setItem('adminNome', response.utilizador.nome || '');
-                localStorage.setItem('adminFuncionarioId', funcionarioId);
-                localStorage.setItem('adminIsAdmin', isAdmin ? 'true' : 'false');
-                if (response.session_id) {
-                    localStorage.setItem('apiSessionId', response.session_id);
+                localStorage.setItem('adminFuncionarioId', response.utilizador.funcionario.funcionario_id || '');
+                if (response.api_token) {
+                    localStorage.setItem('adminToken', response.api_token);
                 }
                 window.location.href = 'index.html';
             } else {
@@ -54,13 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Login error:', error);
             console.error('Error status:', error.status);
             console.error('Error response:', error.response);
-            // #region agent log
-            try {
-                console.error('Error response JSON:', JSON.stringify(error.response || {}, null, 2));
-            } catch (jsonErr) {
-                console.error('Error response JSON stringify failed:', jsonErr);
-            }
-            // #endregion
             
             errorMessage.textContent = errorMsg;
             errorMessage.style.display = 'block';
