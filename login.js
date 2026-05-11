@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('loginForm');
     const errorMessage = document.getElementById('loginError');
 
-    // Check if already logged in
-    if (localStorage.getItem('adminLoggedIn') === 'true') {
+    // Check if already logged in with a valid API session token.
+    if (localStorage.getItem('apiSessionId')) {
         window.location.href = 'index.html';
     }
 
@@ -30,7 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem('adminEmail', email);
                 localStorage.setItem('adminNome', response.utilizador.nome || '');
                 localStorage.setItem('adminFuncionarioId', response.utilizador.funcionario.funcionario_id || '');
-                if (response.api_token) {
+                if (response.session_id) {
+                    localStorage.setItem('apiSessionId', response.session_id);
+                    // Compatibilidade com api.js antigo / copias que ainda leem adminToken.
+                    localStorage.setItem('adminToken', response.session_id);
+                } else if (response.api_token) {
                     localStorage.setItem('adminToken', response.api_token);
                 }
                 window.location.href = 'index.html';

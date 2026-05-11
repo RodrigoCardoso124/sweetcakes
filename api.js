@@ -15,9 +15,14 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         'Accept': 'application/json'
     };
 
-    // Anexa Bearer token se houver sessao admin guardada (necessario para
-    // todos os endpoints protegidos: pessoas, encomendas, funcionarios, etc).
-    const token = localStorage.getItem('adminToken');
+    // Anexa token de sessao do painel. Neste backend/Vercel a sessao duradoura
+    // e validada por X-Session-ID; Authorization fica como compatibilidade com
+    // outras copias da API.
+    const sessionId = localStorage.getItem('apiSessionId');
+    const token = localStorage.getItem('adminToken') || sessionId;
+    if (sessionId) {
+        headers['X-Session-ID'] = sessionId;
+    }
     if (token) {
         headers['Authorization'] = 'Bearer ' + token;
     }
@@ -95,6 +100,14 @@ const API = {
         return apiRequest('login', 'POST', { email, password });
     },
 
+    async getSessionInfo() {
+        return apiRequest('session');
+    },
+
+    async logout() {
+        return apiRequest('logout', 'POST');
+    },
+
     // Encomendas. O backend devolve um envelope paginado
     // ({data, page, per_page, total, total_pages}); aqui devolvemos sempre
     // um array para que o codigo do admin (slice, forEach, etc.) funcione.
@@ -126,8 +139,10 @@ const API = {
     async getEncomendaDetalhes(encomendaId) {
         try {
             const url = `${API_BASE_URL}/encomenda_detalhes?encomenda_id=${encomendaId}`;
-            const token = localStorage.getItem('adminToken');
+            const sessionId = localStorage.getItem('apiSessionId');
+            const token = localStorage.getItem('adminToken') || sessionId;
             const headers = { 'Accept': 'application/json' };
+            if (sessionId) headers['X-Session-ID'] = sessionId;
             if (token) headers['Authorization'] = 'Bearer ' + token;
 
             const response = await fetch(url, {
@@ -191,8 +206,10 @@ const API = {
             formData.append('disponivel', data.disponivel || 1);
             formData.append('imagem', imageFile);
 
-            const token = localStorage.getItem('adminToken');
+            const sessionId = localStorage.getItem('apiSessionId');
+            const token = localStorage.getItem('adminToken') || sessionId;
             const headers = {};
+            if (sessionId) headers['X-Session-ID'] = sessionId;
             if (token) headers['Authorization'] = 'Bearer ' + token;
 
             const response = await fetch(`${API_BASE_URL}/produtos`, {
@@ -221,8 +238,10 @@ const API = {
             if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
             formData.append('imagem', imageFile);
 
-            const token = localStorage.getItem('adminToken');
+            const sessionId = localStorage.getItem('apiSessionId');
+            const token = localStorage.getItem('adminToken') || sessionId;
             const headers = {};
+            if (sessionId) headers['X-Session-ID'] = sessionId;
             if (token) headers['Authorization'] = 'Bearer ' + token;
 
             const response = await fetch(`${API_BASE_URL}/produtos/${id}`, {

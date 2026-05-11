@@ -7,6 +7,10 @@
   },
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/login.html"
+    },
+    {
       "source": "/index.php/:route*",
       "destination": "/api/index.php?route=:route*"
     },

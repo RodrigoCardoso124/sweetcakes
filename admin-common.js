@@ -9,6 +9,7 @@ function clearAdminSession() {
     localStorage.removeItem('adminFuncionarioId');
     localStorage.removeItem('adminIsAdmin');
     localStorage.removeItem('apiSessionId');
+    localStorage.removeItem('adminToken');
   } catch (e) {}
 }
 
@@ -84,9 +85,10 @@ function showToast(message, type) {
 }
 
 function requireAdminPageAuth() {
-  var hasLoggedFlag = localStorage.getItem('adminLoggedIn') === 'true';
   var hasApiSession = !!localStorage.getItem('apiSessionId');
-  if (!hasLoggedFlag && !hasApiSession) {
+  var hasToken = !!localStorage.getItem('adminToken');
+  if (!hasApiSession && !hasToken) {
+    clearAdminSession();
     window.location.href = 'login.html';
     return false;
   }
