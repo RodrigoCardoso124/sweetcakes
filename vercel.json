@@ -7,6 +7,10 @@
   },
   "rewrites": [
     {
+      "source": "/index.php/:route*",
+      "destination": "/api/index.php?route=:route*"
+    },
+    {
       "source": "/index.php",
       "destination": "/api/index.php"
     },
@@ -16,8 +20,3 @@
     }
   ]
 }
-
-
-
-
-
