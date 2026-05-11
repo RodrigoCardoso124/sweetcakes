@@ -100,6 +100,11 @@ const API = {
         return apiRequest('encomendas');
     },
 
+    // Alias retrocompativel (app.js, estatisticas.js antigos chamavam este nome).
+    async getAllEncomendas() {
+        return apiRequest('encomendas');
+    },
+
     async getEncomenda(id) {
         return apiRequest(`encomendas/${id}`);
     },
