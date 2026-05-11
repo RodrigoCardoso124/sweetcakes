@@ -95,14 +95,19 @@ const API = {
         return apiRequest('login', 'POST', { email, password });
     },
 
-    // Encomendas
+    // Encomendas. O backend devolve um envelope paginado
+    // ({data, page, per_page, total, total_pages}); aqui devolvemos sempre
+    // um array para que o codigo do admin (slice, forEach, etc.) funcione.
     async getEncomendas() {
-        return apiRequest('encomendas');
+        const r = await apiRequest('encomendas');
+        if (Array.isArray(r)) return r;
+        if (r && Array.isArray(r.data)) return r.data;
+        return [];
     },
 
     // Alias retrocompativel (app.js, estatisticas.js antigos chamavam este nome).
     async getAllEncomendas() {
-        return apiRequest('encomendas');
+        return this.getEncomendas();
     },
 
     async getEncomenda(id) {
