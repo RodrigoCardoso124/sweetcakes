@@ -198,18 +198,27 @@ class Auth
     public static function pessoaId(): ?int
     {
         self::startSession();
+        if (empty($_SESSION['pessoa_id'])) {
+            self::tryAuthenticateFromToken();
+        }
         return isset($_SESSION['pessoa_id']) ? (int) $_SESSION['pessoa_id'] : null;
     }
 
     public static function utilizadorId(): ?int
     {
         self::startSession();
+        if (empty($_SESSION['utilizador_id'])) {
+            self::tryAuthenticateFromToken();
+        }
         return isset($_SESSION['utilizador_id']) ? (int) $_SESSION['utilizador_id'] : null;
     }
 
     public static function funcionarioId(): ?int
     {
         self::startSession();
+        if (empty($_SESSION['funcionario_id'])) {
+            self::tryAuthenticateFromToken();
+        }
         return isset($_SESSION['funcionario_id']) ? (int) $_SESSION['funcionario_id'] : null;
     }
 
