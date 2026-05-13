@@ -2,19 +2,24 @@
 let allPromocoes = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (typeof initAdminShell === 'function') {
-        if (!initAdminShell()) return;
-    } else {
-        if (localStorage.getItem('adminLoggedIn') !== 'true' || !localStorage.getItem('adminFuncionarioId')) {
-            window.location.href = 'login.html';
-            return;
-        }
+    if (localStorage.getItem('adminLoggedIn') !== 'true' || !localStorage.getItem('adminFuncionarioId')) {
+        window.location.href = 'login.html';
+        return;
     }
     loadPromocoes();
     setupEventListeners();
 });
 
 function setupEventListeners() {
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        localStorage.removeItem('adminLoggedIn');
+        localStorage.removeItem('adminEmail');
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminFuncionarioId');
+        localStorage.removeItem('apiSessionId');
+        window.location.href = 'login.html';
+    });
+
     document.getElementById('refreshBtn').addEventListener('click', loadPromocoes);
     document.getElementById('addPromocaoBtn').addEventListener('click', () => openModal());
 
@@ -65,8 +70,15 @@ function applyFilters() {
 }
 
 function promocaoStatus(p, nowMs) {
-    const ini = Date.parse(p.data_inicio);
-    const fim = Date.parse(p.data_fim);
+    // data_inicio/data_fim vêm em UTC (sem TZ); forçar Z.
+    const parseUtc = (v) => {
+        if (!v) return NaN;
+        const s = String(v).replace(' ', 'T');
+        const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+        return Date.parse(hasTz ? s : s + 'Z');
+    };
+    const ini = parseUtc(p.data_inicio);
+    const fim = parseUtc(p.data_fim);
     if (isFinite(ini) && nowMs < ini) return 'future';
     if (isFinite(fim) && nowMs > fim) return 'expired';
     return 'active';
@@ -133,7 +145,10 @@ function formatEur(value) {
 
 function formatDate(value) {
     if (!value) return '—';
-    const d = new Date(value.replace(' ', 'T'));
+    // A BD guarda em UTC; converter para hora local para apresentação.
+    const s = String(value).replace(' ', 'T');
+    const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+    const d = new Date(hasTz ? s : s + 'Z');
     if (isNaN(d.getTime())) return value;
     return d.toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' });
 }
@@ -197,12 +212,31 @@ function openModal(promocao = null) {
     modal.classList.add('active');
 }
 
+// Recebe data UTC do servidor (ex.: "2026-05-13 11:36:00") e devolve string
+// "YYYY-MM-DDTHH:MM" em hora LOCAL para colocar num input datetime-local.
 function toDatetimeLocal(value) {
     if (!value) return '';
-    const d = value instanceof Date ? value : new Date(String(value).replace(' ', 'T'));
+    let d;
+    if (value instanceof Date) {
+        d = value;
+    } else {
+        // Tratar a string como UTC adicionando 'Z' (a BD está em UTC).
+        const s = String(value).replace(' ', 'T');
+        const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+        d = new Date(hasTz ? s : s + 'Z');
+    }
     if (isNaN(d.getTime())) return '';
     const pad = (n) => n.toString().padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Recebe valor do input datetime-local (hora local) e devolve "YYYY-MM-DD HH:MM:SS" em UTC.
+function fromDatetimeLocalToUtc(localStr) {
+    if (!localStr) return null;
+    const d = new Date(localStr); // datetime-local é interpretado como hora local
+    if (isNaN(d.getTime())) return null;
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
 async function savePromocao(e) {
@@ -216,8 +250,8 @@ async function savePromocao(e) {
         tipo,
         min_compra: parseFloat(document.getElementById('promoMinCompra').value) || 0,
         uso_unico: document.getElementById('promoUsoUnico').checked ? 1 : 0,
-        data_inicio: document.getElementById('promoDataInicio').value.replace('T', ' ') + ':00',
-        data_fim: document.getElementById('promoDataFim').value.replace('T', ' ') + ':00',
+        data_inicio: fromDatetimeLocalToUtc(document.getElementById('promoDataInicio').value),
+        data_fim: fromDatetimeLocalToUtc(document.getElementById('promoDataFim').value),
     };
 
     if (tipo === 'percentual') {
