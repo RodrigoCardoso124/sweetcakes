@@ -21,6 +21,10 @@
     {
       "source": "/image.php",
       "destination": "/api/image.php"
+    },
+    {
+      "source": "/stripe_create_payment_intent.php",
+      "destination": "/api/stripe_create_payment_intent.php"
     }
   ]
 }
