@@ -2,8 +2,10 @@
 include_once __DIR__ . '/../models/Encomenda.php';
 include_once __DIR__ . '/../models/Pessoa.php';
 include_once __DIR__ . '/../models/Funcionario.php';
+include_once __DIR__ . '/../models/Promocao.php';
 require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/AuditHelper.php';
+require_once __DIR__ . '/../helpers/PromocaoHelper.php';
 
 class EncomendaController
 {
@@ -137,6 +139,37 @@ class EncomendaController
             return;
         }
 
+        // Promoção opcional: validar e calcular desconto antes de gravar.
+        $promocaoId = isset($data['promocao_id']) && $data['promocao_id'] !== '' ? (int)$data['promocao_id'] : null;
+        $desconto = 0.0;
+        $promoRepo = null;
+        $promoRow = null;
+        if ($promocaoId !== null && $promocaoId > 0) {
+            $promoRepo = new Promocao($this->db);
+            $promoRow = $promoRepo->getById($promocaoId);
+            if (!$promoRow) {
+                http_response_code(400);
+                echo json_encode(['message' => 'Promoção inválida']);
+                return;
+            }
+            $err = PromocaoHelper::validarParaPessoa($promoRow, (int)$data['cliente_id'], $promoRepo);
+            if ($err !== null) {
+                http_response_code(400);
+                echo json_encode(['message' => $err]);
+                return;
+            }
+            $subtotalCliente = isset($data['subtotal'])
+                ? (float)$data['subtotal']
+                : ((float)$data['total'] + (float)($data['desconto'] ?? 0));
+            $itens = is_array($data['itens'] ?? null) ? $data['itens'] : [];
+            $desconto = PromocaoHelper::calcularDesconto($promoRow, $subtotalCliente, $itens);
+            if ($desconto < 0) $desconto = 0.0;
+            $esperado = max(0.0, $subtotalCliente - $desconto);
+            if (abs((float)$data['total'] - $esperado) > 0.05) {
+                $data['total'] = round($esperado, 2);
+            }
+        }
+
         $this->encomenda->cliente_id = $data['cliente_id'];
         $this->encomenda->funcionario_id = $data['funcionario_id'];
         $this->encomenda->estado = $data['estado'];
@@ -144,10 +177,27 @@ class EncomendaController
 
         if ($this->encomenda->create()) {
             $encomendaId = $this->db->lastInsertId();
+            if ($promocaoId !== null && $promocaoId > 0 && $encomendaId) {
+                try {
+                    $upd = $this->db->prepare('UPDATE encomendas SET promocao_id = :p, desconto = :d WHERE encomenda_id = :id');
+                    $upd->bindValue(':p', $promocaoId, PDO::PARAM_INT);
+                    $upd->bindValue(':d', $desconto);
+                    $upd->bindValue(':id', $encomendaId, PDO::PARAM_INT);
+                    $upd->execute();
+                    if ($promoRepo !== null) {
+                        $promoRepo->registarUso($promocaoId, (int)$data['cliente_id'], (int)$encomendaId, $desconto);
+                    }
+                } catch (Throwable $e) {
+                    error_log('Falha a guardar promoção na encomenda: ' . $e->getMessage());
+                }
+            }
             http_response_code(201);
             echo json_encode([
                 'message' => 'Encomenda criada com sucesso',
                 'encomenda_id' => $encomendaId,
+                'total' => (float)$data['total'],
+                'desconto' => $desconto,
+                'promocao_id' => $promocaoId,
             ]);
         } else {
             http_response_code(500);

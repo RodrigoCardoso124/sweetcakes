@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <title>Gestão de Promoções - Sweet Cakes</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .promo-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+            border-left: 5px solid var(--primary-color);
+        }
+        .promo-card.inactive {
+            opacity: 0.65;
+            border-left-color: var(--text-secondary);
+        }
+        .promo-card.future {
+            border-left-color: var(--info);
+        }
+        .promo-card.expired {
+            border-left-color: var(--danger);
+        }
+        .promo-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .promo-card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        .promo-card-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .promo-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .badge-active { background: rgba(76, 175, 80, 0.15); color: var(--success); }
+        .badge-future { background: rgba(33, 150, 243, 0.15); color: var(--info); }
+        .badge-expired { background: rgba(244, 67, 54, 0.15); color: var(--danger); }
+        .promo-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .promo-meta strong { color: var(--text-primary); }
+        .promo-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .promo-actions .btn { flex: 1; }
+        .promos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+        .type-fields { display: none; }
+        .type-fields.active { display: block; }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+        }
+        .checkbox-row input[type="checkbox"] { width: 18px; height: 18px; }
+        .help-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body data-page-scope="admin">
+    <div class="admin-container">
+        <aside class="sidebar" id="admin-sidebar">
+            <div class="sidebar-header">
+                <h1>🍰 Sweet Cakes</h1>
+                <p>Painel Administrativo</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📦</span>
+                    <span>Encomendas</span>
+                </a>
+                <a href="clientes.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">👥</span>
+                    <span>Clientes</span>
+                </a>
+                <a href="produtos.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">🍰</span>
+                    <span>Produtos</span>
+                </a>
+                <a href="promocoes.html" class="nav-item active" data-admin-only="true">
+                    <span class="icon">🎁</span>
+                    <span>Promoções</span>
+                </a>
+                <a href="funcionarios.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">👔</span>
+                    <span>Funcionários</span>
+                </a>
+                <a href="estatisticas.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">📊</span>
+                    <span>Estatísticas</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">Sair</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <h2>Gestão de Promoções</h2>
+                <div class="header-actions">
+                    <button id="addPromocaoBtn" class="btn btn-primary">+ Nova Promoção</button>
+                    <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
+                </div>
+            </header>
+
+            <div class="filters">
+                <select id="statusFilter" class="filter-select">
+                    <option value="">Todos</option>
+                    <option value="active">Activas agora</option>
+                    <option value="future">Programadas</option>
+                    <option value="expired">Expiradas</option>
+                </select>
+                <input type="text" id="searchInput" class="search-input" placeholder="🔍 Pesquisar por título...">
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🎉</div>
+                    <div class="stat-info">
+                        <h3 id="activeCount">0</h3>
+                        <p>Activas agora</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-info">
+                        <h3 id="futureCount">0</h3>
+                        <p>Programadas</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-info">
+                        <h3 id="expiredCount">0</h3>
+                        <p>Expiradas</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="promocoesGrid" class="promos-grid">
+                <div class="loading">A carregar promoções...</div>
+            </div>
+        </main>
+    </div>
+
+    <div id="promocaoModal" class="modal">
+        <div class="modal-content" style="max-width: 720px;">
+            <span class="close">&times;</span>
+            <h3 id="modalTitle">Nova Promoção</h3>
+            <form id="promocaoForm">
+                <input type="hidden" id="promocaoId">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="promoTitulo">Título *</label>
+                        <input type="text" id="promoTitulo" maxlength="100" required placeholder="Ex.: PROMOÇÃO, BLACK FRIDAY">
+                    </div>
+                    <div class="form-group">
+                        <label for="promoTipo">Tipo *</label>
+                        <select id="promoTipo" required>
+                            <option value="percentual">Percentagem (% OFF)</option>
+                            <option value="valor_fixo">Valor fixo (€ OFF)</option>
+                            <option value="oferta">Oferta / Mensagem livre</option>
+                            <option value="leve_pague">Leve X pague Y</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="promoSubtitulo">Subtítulo</label>
+                    <input type="text" id="promoSubtitulo" maxlength="255" placeholder="Ex.: Em encomendas feitas hoje!">
+                </div>
+
+                <div class="type-fields" data-type="percentual">
+                    <div class="form-group">
+                        <label for="promoPercentual">Percentagem (1-100) *</label>
+                        <input type="number" id="promoPercentual" step="0.01" min="0.01" max="100" placeholder="15">
+                    </div>
+                </div>
+
+                <div class="type-fields" data-type="valor_fixo">
+                    <div class="form-group">
+                        <label for="promoValorFixo">Desconto em € *</label>
+                        <input type="number" id="promoValorFixo" step="0.01" min="0.01" placeholder="5.00">
+                    </div>
+                </div>
+
+                <div class="type-fields" data-type="oferta">
+                    <div class="form-group">
+                        <label for="promoMensagem">Mensagem da oferta *</label>
+                        <input type="text" id="promoMensagem" maxlength="255" placeholder="Ex.: Oferta de cupcake na primeira encomenda">
+                        <div class="help-text">Esta promoção é apenas visual; não aplica desconto automático.</div>
+                    </div>
+                </div>
+
+                <div class="type-fields" data-type="leve_pague">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="promoLeveQtd">Leve *</label>
+                            <input type="number" id="promoLeveQtd" min="2" max="99" placeholder="3">
+                        </div>
+                        <div class="form-group">
+                            <label for="promoPagueQtd">Pague *</label>
+                            <input type="number" id="promoPagueQtd" min="1" max="98" placeholder="2">
+                        </div>
+                    </div>
+                    <div class="help-text">Ex.: Leve 3, pague 2. O desconto é calculado pelo preço médio do carrinho.</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="promoDataInicio">Data início *</label>
+                        <input type="datetime-local" id="promoDataInicio" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="promoDataFim">Data fim *</label>
+                        <input type="datetime-local" id="promoDataFim" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="promoMinCompra">Compra mínima (€)</label>
+                        <input type="number" id="promoMinCompra" step="0.01" min="0" value="0">
+                        <div class="help-text">0 = sem mínimo.</div>
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <div class="checkbox-row">
+                            <input type="checkbox" id="promoUsoUnico">
+                            <label for="promoUsoUnico">Uso único por utilizador</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" id="cancelPromocaoBtn" class="btn btn-secondary">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="admin-common.js"></script>
+    <script src="promocoes.js"></script>
+</body>
+</html>

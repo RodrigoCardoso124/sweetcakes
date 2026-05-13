@@ -174,6 +174,7 @@ $routes = [
     'encomendas' => 'EncomendaController',
     'encomenda_detalhes' => 'EncomendaDetalheController',
     'utilizadores' => 'UtilizadorController',
+    'promocoes' => 'PromocaoController',
 ];
 
 /**
@@ -182,6 +183,10 @@ $routes = [
 function sc_is_public_api_route(?string $resource, string $method): bool
 {
     if ($resource === 'produtos' && $method === 'GET') {
+        return true;
+    }
+    if ($resource === 'promocoes' && $method === 'GET') {
+        // Listagem/leitura pública das promoções activas.
         return true;
     }
     if ($resource === 'verify_email' && in_array($method, ['GET', 'POST'], true)) {
@@ -206,6 +211,10 @@ function sc_route_requires_admin(?string $resource, string $method): bool
         return true;
     }
     if ($resource === 'produtos' && $method !== 'GET') {
+        return true;
+    }
+    if ($resource === 'promocoes' && $method !== 'GET') {
+        // Criar/editar/apagar promoções requer painel admin.
         return true;
     }
     if ($resource === 'encomendas' && $method === 'DELETE') {

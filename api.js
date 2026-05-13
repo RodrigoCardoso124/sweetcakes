@@ -297,6 +297,31 @@ const API = {
 
     async deleteCliente(id) {
         return apiRequest(`pessoas/${id}`, 'DELETE');
+    },
+
+    // Promoções (admin)
+    async getPromocoes() {
+        return apiRequest('promocoes');
+    },
+
+    async getPromocoesAll() {
+        return apiRequest('promocoes?all=1');
+    },
+
+    async getPromocao(id) {
+        return apiRequest(`promocoes/${id}`);
+    },
+
+    async createPromocao(data) {
+        return apiRequest('promocoes', 'POST', data);
+    },
+
+    async updatePromocao(id, data) {
+        return apiRequest(`promocoes/${id}`, 'PUT', data);
+    },
+
+    async deletePromocao(id) {
+        return apiRequest(`promocoes/${id}`, 'DELETE');
     }
 };
 
