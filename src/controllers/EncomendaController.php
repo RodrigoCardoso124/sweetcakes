@@ -28,6 +28,7 @@ class EncomendaController
             $page = max(1, (int) ($_GET['page'] ?? 1));
             $perPage = min(100, max(1, (int) ($_GET['per_page'] ?? 50)));
             $offset = ($page - 1) * $perPage;
+            $wantsPaged = isset($_GET['page']) || isset($_GET['per_page']) || isset($_GET['paged']);
 
             if (Auth::isAdmin() || Auth::isFuncionario()) {
                 $total = $this->encomenda->countRows(null);
@@ -50,19 +51,26 @@ class EncomendaController
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 0;
 
-            $payload = [
-                'data' => $rows,
-                'page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'total_pages' => $totalPages,
-            ];
-
             $flags = JSON_UNESCAPED_UNICODE;
             if (defined('JSON_INVALID_UTF8_SUBSTITUTE')) {
                 $flags |= JSON_INVALID_UTF8_SUBSTITUTE;
             }
-            $json = json_encode($payload, $flags);
+
+            // A app mobile espera lista directa. O painel admin pede com ?page=
+            // e nesse caso devolvemos o payload paginado completo.
+            if ($wantsPaged) {
+                $payload = [
+                    'data' => $rows,
+                    'page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'total_pages' => $totalPages,
+                ];
+                $json = json_encode($payload, $flags);
+            } else {
+                $json = json_encode($rows, $flags);
+            }
+
             if ($json === false) {
                 throw new RuntimeException('json_encode falhou: '.json_last_error_msg());
             }

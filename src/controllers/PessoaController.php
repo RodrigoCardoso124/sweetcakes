@@ -55,12 +55,37 @@ class PessoaController
         $this->pessoa->morada = $data['morada'];
 
         if ($this->pessoa->create()) {
+            $novoId = (int) $this->db->lastInsertId();
             http_response_code(201);
-            echo json_encode(['message' => 'Pessoa criada com sucesso']);
+            echo json_encode([
+                'message' => 'Pessoa criada com sucesso',
+                'pessoa_id' => $novoId,
+                'nome' => $this->pessoa->nome,
+                'email' => $this->pessoa->email,
+            ]);
         } else {
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao criar pessoa']);
         }
+    }
+
+    public function checkEmail($data)
+    {
+        if (!is_array($data)) {
+            $data = [];
+        }
+        $email = trim((string) ($data['email'] ?? ($_GET['email'] ?? '')));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Email inválido']);
+            return;
+        }
+
+        $stmt = $this->db->prepare('SELECT pessoa_id FROM pessoas WHERE email = :email LIMIT 1');
+        $stmt->bindValue(':email', $email);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode(['exists' => $row ? true : false]);
     }
 
     public function update($id, $data)

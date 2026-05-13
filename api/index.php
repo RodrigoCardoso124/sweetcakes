@@ -302,6 +302,12 @@ if ($resource === 'login' && $httpMethod === 'POST') {
     exit();
 }
 
+if ($resource === 'check_email' && $httpMethod === 'POST') {
+    $controller = new PessoaController($db);
+    $controller->checkEmail($input ?? []);
+    exit();
+}
+
 if ($resource === 'admin' && $subResource === 'login' && $httpMethod === 'POST') {
     $controller = new UtilizadorController($db);
     $controller->adminLogin($input);
