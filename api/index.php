@@ -185,6 +185,17 @@ function sc_is_public_api_route(?string $resource, string $method): bool
     if ($resource === 'produtos' && $method === 'GET') {
         return true;
     }
+    if ($resource === 'check_email' && $method === 'POST') {
+        return true;
+    }
+    if ($resource === 'pessoas' && $method === 'POST') {
+        // Registo público de cliente na app.
+        return true;
+    }
+    if ($resource === 'utilizadores' && $method === 'POST') {
+        // Criação da conta depois de criar a pessoa no fluxo de registo.
+        return true;
+    }
     if ($resource === 'promocoes' && $method === 'GET') {
         // Listagem/leitura pública das promoções activas.
         return true;
@@ -207,6 +218,12 @@ function sc_is_public_api_route(?string $resource, string $method): bool
 function sc_route_requires_admin(?string $resource, string $method): bool
 {
     $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores'];
+    if ($resource === 'pessoas' && $method === 'POST') {
+        return false;
+    }
+    if ($resource === 'utilizadores' && $method === 'POST') {
+        return false;
+    }
     if (in_array($resource, $adminOnly, true)) {
         return true;
     }

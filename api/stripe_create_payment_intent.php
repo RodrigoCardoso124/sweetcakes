@@ -3,6 +3,9 @@
  * Cria um PaymentIntent no Stripe e devolve o client_secret para o Flutter.
  * Vercel: PHPs só são executados como funções serverless quando dentro de /api.
  */
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization');
@@ -59,7 +62,6 @@ curl_setopt_array($ch, [
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $curlError = curl_error($ch);
-curl_close($ch);
 
 if ($curlError) {
     http_response_code(500);
