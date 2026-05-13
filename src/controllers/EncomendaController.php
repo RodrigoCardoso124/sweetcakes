@@ -3,6 +3,7 @@ include_once __DIR__ . '/../models/Encomenda.php';
 include_once __DIR__ . '/../models/Pessoa.php';
 include_once __DIR__ . '/../models/Funcionario.php';
 include_once __DIR__ . '/../models/Promocao.php';
+include_once __DIR__ . '/../models/FidelidadePontos.php';
 require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/AuditHelper.php';
 require_once __DIR__ . '/../helpers/PromocaoHelper.php';
@@ -199,6 +200,17 @@ class EncomendaController
                     error_log('Falha a guardar promoção na encomenda: ' . $e->getMessage());
                 }
             }
+
+            // Atribuição de pontos de fidelidade: 1 ponto por € (truncado).
+            try {
+                $fp = new FidelidadePontos($this->db);
+                $fp->ensureSchema();
+                $pontosGanhar = (int) floor((float) $data['total']);
+                $fp->addPoints((int) $data['cliente_id'], $pontosGanhar);
+            } catch (Throwable $e) {
+                error_log('Fidelidade após encomenda: ' . $e->getMessage());
+            }
+
             http_response_code(201);
             echo json_encode([
                 'message' => 'Encomenda criada com sucesso',

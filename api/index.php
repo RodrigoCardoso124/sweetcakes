@@ -175,6 +175,7 @@ $routes = [
     'encomenda_detalhes' => 'EncomendaDetalheController',
     'utilizadores' => 'UtilizadorController',
     'promocoes' => 'PromocaoController',
+    'fidelidade' => 'FidelidadeController',
 ];
 
 /**
@@ -222,6 +223,9 @@ function sc_route_requires_admin(?string $resource, string $method): bool
         return false;
     }
     if ($resource === 'utilizadores' && $method === 'POST') {
+        return false;
+    }
+    if ($resource === 'fidelidade') {
         return false;
     }
     if (in_array($resource, $adminOnly, true)) {
