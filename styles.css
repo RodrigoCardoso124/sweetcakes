@@ -29,6 +29,19 @@
     --radius-md: 10px;
     --dash-border: #e8e4df;
     --dash-muted: #6b6560;
+    /* Tabelas e alertas — mesma família cromática em todo o painel */
+    --table-head-start: #5c4a3a;
+    --table-head-end: #45372e;
+    --table-head-text: #faf8f5;
+    --table-row-hover: rgba(107, 83, 68, 0.07);
+    --surface-warn: #fff6e8;
+    --border-warn: #e8d4bc;
+    --text-warn: #6b4f1d;
+    --pill-info-bg: rgba(45, 139, 196, 0.12);
+    --pill-info-text: #1a5a7a;
+    --pill-warn-bg: rgba(230, 126, 34, 0.16);
+    --pill-warn-text: #9a5410;
+    --pill-muted-bg: rgba(92, 83, 76, 0.1);
 }
 
 body {
@@ -264,7 +277,21 @@ body {
 
 .header-actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+/* Título + menu móvel: não encostar às acções da direita */
+.header-left {
+    display: flex;
+    align-items: flex-start;
     gap: 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 /* Buttons */
@@ -298,7 +325,8 @@ body {
 }
 
 .btn-secondary:hover {
-    background: #555;
+    background: #574840;
+    background: color-mix(in srgb, var(--secondary-color) 88%, #000);
 }
 
 .btn-success {
@@ -396,8 +424,8 @@ body {
 }
 
 .orders-table thead {
-    background: var(--primary-color);
-    color: white;
+    background: linear-gradient(180deg, var(--table-head-start) 0%, var(--table-head-end) 100%);
+    color: var(--table-head-text);
 }
 
 .orders-table th {
@@ -412,10 +440,11 @@ body {
 .orders-table td {
     padding: 16px;
     border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
 }
 
 .orders-table tbody tr:hover {
-    background: rgba(212, 165, 116, 0.05);
+    background: var(--table-row-hover);
 }
 
 .orders-table tbody tr:last-child td {
@@ -537,6 +566,8 @@ body {
 
 .modal-content h3 {
     margin-bottom: 16px;
+    margin-top: 0;
+    padding-right: 40px;
     color: var(--text-primary);
 }
 
@@ -1102,8 +1133,10 @@ textarea:focus {
 
 .section-title {
     font-size: 1.1rem;
+    font-weight: 700;
     margin-bottom: 12px;
-    color: var(--secondary-color);
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
 }
 
 .table-wrap {
@@ -1116,7 +1149,7 @@ textarea:focus {
 }
 
 .row-warn {
-    background: #fff8e6;
+    background: var(--surface-warn);
 }
 
 .stock-pill {
@@ -1124,18 +1157,19 @@ textarea:focus {
     font-size: 13px;
     padding: 4px 10px;
     border-radius: 999px;
-    background: #eef6ff;
+    background: var(--pill-info-bg);
+    color: var(--pill-info-text);
     margin-right: 6px;
 }
 
 .stock-pill--warn {
-    background: #fff3e0;
-    color: #b45309;
+    background: var(--pill-warn-bg);
+    color: var(--pill-warn-text);
 }
 
 .stock-pill--muted {
-    background: #f0f0f0;
-    color: #666;
+    background: var(--pill-muted-bg);
+    color: var(--text-secondary);
 }
 
 .product-stock-row {
@@ -1143,9 +1177,9 @@ textarea:focus {
 }
 
 .alert-banner {
-    background: #fff3e0;
-    border: 1px solid #f0d4a8;
-    color: #6b4f1d;
+    background: var(--surface-warn);
+    border: 1px solid var(--border-warn);
+    color: var(--text-warn);
     padding: 12px 14px;
     border-radius: 10px;
     margin-bottom: 18px;
@@ -1164,10 +1198,20 @@ textarea:focus {
     border-radius: 12px;
     padding: 16px;
     box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
 }
 
 .info-card h4 {
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+}
+
+.info-card > .btn {
+    margin-top: 10px;
+    align-self: flex-start;
 }
 
 .muted {
@@ -1183,8 +1227,20 @@ textarea:focus {
 .recipe-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 10px 12px;
     align-items: center;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+.recipe-actions .qty-input {
+    flex: 0 0 auto;
+}
+
+.recipe-actions .btn {
+    flex: 0 1 auto;
+    min-width: 0;
 }
 
 .qty-input {
@@ -1199,7 +1255,22 @@ textarea:focus {
     font-size: 13px;
 }
 
+/* Células com botões: evita sobreposição visual em ecrãs estreitos */
+.orders-table td .btn-sm + .btn-sm {
+    margin-left: 4px;
+}
+
 @media (max-width: 600px) {
+    .recipe-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .recipe-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
     .header {
         flex-direction: column;
         align-items: flex-start;
@@ -1389,13 +1460,13 @@ textarea:focus {
 }
 
 .history-pill--ok {
-    border-color: #c8e6c9;
-    background: #f1faf1;
+    border-color: rgba(61, 154, 85, 0.35);
+    background: rgba(61, 154, 85, 0.09);
 }
 
 .history-pill--muted {
-    border-color: #e0e0e0;
-    background: #fafafa;
+    border-color: var(--border-color);
+    background: var(--background-soft);
 }
 
 .table-card {
@@ -1435,8 +1506,8 @@ textarea:focus {
 }
 
 .orders-table--dashboard thead {
-    background: linear-gradient(180deg, #5c4a3a 0%, #4a3d32 100%);
-    color: #fff;
+    background: linear-gradient(180deg, var(--table-head-start) 0%, var(--table-head-end) 100%);
+    color: var(--table-head-text);
 }
 
 .orders-table--dashboard .cell-client-email {

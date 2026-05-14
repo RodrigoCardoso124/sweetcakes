@@ -62,14 +62,17 @@
         <!-- Main Content -->
         <main class="main-content">
             <header class="header">
-                <h2>Estatísticas e Relatórios</h2>
+                <div class="header-left">
+                    <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
+                    <h2>Estatísticas e Relatórios</h2>
+                </div>
                 <div class="header-actions">
                     <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
                 </div>
             </header>
 
             <!-- Main Stats -->
-            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+            <div class="stats-grid">
                 <div class="stat-card">
                     <div class="stat-icon">📦</div>
                     <div class="stat-info">
