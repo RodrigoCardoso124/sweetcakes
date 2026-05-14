@@ -16,6 +16,7 @@ class ProdutoController {
         $this->produtoIngrediente = new ProdutoIngrediente($db);
         $this->ingrediente = new Ingredientes($db);
         $this->ensureAlergeniosColumn();
+        $this->ensureStockColumns();
         $this->cloudinaryConfig = $this->loadCloudinaryConfig();
     }
 
@@ -73,6 +74,22 @@ class ProdutoController {
         $stmt = $this->db->query("SHOW COLUMNS FROM produtos LIKE 'alergenios'");
         if (!$stmt || !$stmt->fetch(PDO::FETCH_ASSOC)) {
             $this->db->exec("ALTER TABLE produtos ADD COLUMN alergenios TEXT NULL");
+        }
+    }
+
+    private function ensureStockColumns(): void
+    {
+        try {
+            $stmt = $this->db->query("SHOW COLUMNS FROM produtos LIKE 'stock_atual'");
+            if (!$stmt || !$stmt->fetch(PDO::FETCH_ASSOC)) {
+                $this->db->exec('ALTER TABLE produtos ADD COLUMN stock_atual INT NOT NULL DEFAULT 0 AFTER disponivel');
+            }
+            $stmt = $this->db->query("SHOW COLUMNS FROM produtos LIKE 'stock_minimo'");
+            if (!$stmt || !$stmt->fetch(PDO::FETCH_ASSOC)) {
+                $this->db->exec('ALTER TABLE produtos ADD COLUMN stock_minimo INT NOT NULL DEFAULT 0 AFTER stock_atual');
+            }
+        } catch (Throwable $e) {
+            error_log('ensureStockColumns: ' . $e->getMessage());
         }
     }
 
@@ -314,7 +331,9 @@ class ProdutoController {
         $this->produto->nome       = $data['nome'];
         $this->produto->descricao  = $data['descricao'];
         $this->produto->preco      = $data['preco'];
-        $this->produto->disponivel = 1;
+        $this->produto->disponivel = isset($data['disponivel']) ? (int) $data['disponivel'] : 1;
+        $this->produto->stock_atual = isset($data['stock_atual']) ? (int) $data['stock_atual'] : 0;
+        $this->produto->stock_minimo = isset($data['stock_minimo']) ? (int) $data['stock_minimo'] : 0;
         $this->produto->imagem     = $nomeImagem;
         $this->produto->alergenios = $this->normalizarAlergeniosParaGuardar($data['alergenios'] ?? null);
 
@@ -360,7 +379,15 @@ class ProdutoController {
         $this->produto->nome       = $data['nome']       ?? $produtoAtual['nome'];
         $this->produto->descricao  = $data['descricao']  ?? $produtoAtual['descricao'];
         $this->produto->preco      = $data['preco']      ?? $produtoAtual['preco'];
-        $this->produto->disponivel = $produtoAtual['disponivel'];
+        $this->produto->disponivel = array_key_exists('disponivel', $data)
+            ? (int) $data['disponivel']
+            : (int) ($produtoAtual['disponivel'] ?? 1);
+        $this->produto->stock_atual = array_key_exists('stock_atual', $data)
+            ? (int) $data['stock_atual']
+            : (int) ($produtoAtual['stock_atual'] ?? 0);
+        $this->produto->stock_minimo = array_key_exists('stock_minimo', $data)
+            ? (int) $data['stock_minimo']
+            : (int) ($produtoAtual['stock_minimo'] ?? 0);
         $this->produto->imagem     = $imagemValor;
         $this->produto->alergenios = array_key_exists('alergenios', $data)
             ? $this->normalizarAlergeniosParaGuardar($data['alergenios'])

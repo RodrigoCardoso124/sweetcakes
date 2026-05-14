@@ -66,6 +66,19 @@ class Ingredientes {
         return $stmt->execute();
     }
 
+    /**
+     * Adiciona ou remove stock (delta pode ser negativo).
+     */
+    public function adjustQuantidade(int $id, float $delta): bool
+    {
+        $stmt = $this->conn->prepare(
+            "UPDATE {$this->table} SET quantidade_atual = quantidade_atual + :d WHERE ingrediente_id = :id"
+        );
+        $stmt->bindValue(':d', $delta);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+
     public function delete() {
         $query = "DELETE FROM {$this->table} WHERE ingrediente_id = :id";
         $stmt  = $this->conn->prepare($query);

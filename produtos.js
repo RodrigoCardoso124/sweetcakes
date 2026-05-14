@@ -95,6 +95,9 @@ function renderProdutos(produtos) {
     }
 
     grid.innerHTML = produtos.map(produto => {
+        const stockAtual = parseInt(produto.stock_atual, 10) || 0;
+        const stockMin = parseInt(produto.stock_minimo, 10) || 0;
+        const stockLow = stockMin > 0 && stockAtual <= stockMin;
         const imagemUrl = produto.imagem_url
             ? getProdutoImageUrl(produto.imagem_url)
             : (produto.imagem ? getProdutoImageUrl(produto.imagem) : PLACEHOLDER_SEM_IMAGEM);
@@ -117,6 +120,10 @@ function renderProdutos(produtos) {
                     <p class="product-description">${escapeHtml(produto.descricao || 'Sem descrição')}</p>
                     ${alergeniosHtml || ''}
                     <div class="product-price">€${parseFloat(produto.preco || 0).toFixed(2)}</div>
+                    <div class="product-stock-row">
+                        <span class="stock-pill ${stockLow ? 'stock-pill--warn' : ''}">Stock: <strong>${stockAtual}</strong></span>
+                        <span class="stock-pill stock-pill--muted">Mín: ${stockMin}</span>
+                    </div>
                     <div class="product-actions">
                         <button class="btn btn-secondary" onclick="editProduto(${produto.produto_id})">Editar</button>
                         <button class="btn btn-danger" onclick="deleteProduto(${produto.produto_id})">Apagar</button>
@@ -161,6 +168,8 @@ function openProdutoModal(produto = null) {
         document.getElementById('produtoDescricao').value = produto.descricao || '';
         document.getElementById('produtoPreco').value = produto.preco || '';
         document.getElementById('produtoDisponivel').value = produto.disponivel || 1;
+        document.getElementById('produtoStockAtual').value = produto.stock_atual != null ? produto.stock_atual : 0;
+        document.getElementById('produtoStockMinimo').value = produto.stock_minimo != null ? produto.stock_minimo : 0;
         setAlergeniosSelecionados(Array.isArray(produto.alergenios) ? produto.alergenios : []);
         
         if (produto.imagem) {
@@ -169,6 +178,8 @@ function openProdutoModal(produto = null) {
         }
     } else {
         title.textContent = 'Novo Produto';
+        document.getElementById('produtoStockAtual').value = '0';
+        document.getElementById('produtoStockMinimo').value = '0';
         setAlergeniosSelecionados([]);
     }
     
@@ -197,6 +208,8 @@ async function saveProduto(e) {
         descricao: document.getElementById('produtoDescricao').value,
         preco: document.getElementById('produtoPreco').value,
         disponivel: document.getElementById('produtoDisponivel').value,
+        stock_atual: parseInt(document.getElementById('produtoStockAtual').value, 10) || 0,
+        stock_minimo: parseInt(document.getElementById('produtoStockMinimo').value, 10) || 0,
         alergenios: getAlergeniosSelecionados().join(', ')
     };
     

@@ -41,6 +41,18 @@
                     <span class="icon">📊</span>
                     <span>Estatísticas</span>
                 </a>
+                <a href="producao.html" class="nav-item">
+                    <span class="icon">🏭</span>
+                    <span>Produção</span>
+                </a>
+                <a href="receitas.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">📋</span>
+                    <span>Receitas</span>
+                </a>
+                <a href="materiais-stock.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">🧂</span>
+                    <span>Materiais</span>
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">Sair</button>
@@ -113,6 +125,17 @@
                 <div class="form-group">
                     <label for="produtoPreco">Preço (€) *</label>
                     <input type="number" id="produtoPreco" name="preco" step="0.01" min="0" required>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="produtoStockAtual">Stock actual (unidades)</label>
+                        <input type="number" id="produtoStockAtual" name="stock_atual" min="0" step="1" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="produtoStockMinimo">Stock mínimo (alerta)</label>
+                        <input type="number" id="produtoStockMinimo" name="stock_minimo" min="0" step="1" value="0">
+                        <small style="color:#666;font-size:12px;">Quando o stock ≤ mínimo, aparece alerta na produção.</small>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Alergénios</label>

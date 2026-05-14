@@ -204,6 +204,8 @@ const API = {
             formData.append('descricao', data.descricao);
             formData.append('preco', data.preco);
             formData.append('disponivel', data.disponivel || 1);
+            formData.append('stock_atual', data.stock_atual != null ? String(data.stock_atual) : '0');
+            formData.append('stock_minimo', data.stock_minimo != null ? String(data.stock_minimo) : '0');
             formData.append('imagem', imageFile);
 
             const sessionId = localStorage.getItem('apiSessionId');
@@ -236,6 +238,8 @@ const API = {
             if (data.descricao) formData.append('descricao', data.descricao);
             if (data.preco) formData.append('preco', data.preco);
             if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
+            if (data.stock_atual !== undefined) formData.append('stock_atual', String(data.stock_atual));
+            if (data.stock_minimo !== undefined) formData.append('stock_minimo', String(data.stock_minimo));
             formData.append('imagem', imageFile);
 
             const sessionId = localStorage.getItem('apiSessionId');
@@ -322,6 +326,59 @@ const API = {
 
     async deletePromocao(id) {
         return apiRequest(`promocoes/${id}`, 'DELETE');
+    },
+
+    async getIngredientes() {
+        return apiRequest('ingredientes');
+    },
+
+    async createIngrediente(data) {
+        return apiRequest('ingredientes', 'POST', data);
+    },
+
+    async updateIngrediente(id, data) {
+        return apiRequest(`ingredientes/${id}`, 'PUT', data);
+    },
+
+    async getProducaoResumo() {
+        return apiRequest('producao');
+    },
+
+    async postProducao(body) {
+        return apiRequest('producao', 'POST', body);
+    },
+
+    async getReceitas() {
+        return apiRequest('receitas');
+    },
+
+    async getReceita(id) {
+        return apiRequest(`receitas/${id}`);
+    },
+
+    async createReceita(data) {
+        return apiRequest('receitas', 'POST', data);
+    },
+
+    async updateReceita(id, data) {
+        return apiRequest(`receitas/${id}`, 'PUT', data);
+    },
+
+    async deleteReceita(id) {
+        return apiRequest(`receitas/${id}`, 'DELETE');
+    },
+
+    async getPedidosIngrediente(estado) {
+        const q = estado ? `?estado=${encodeURIComponent(estado)}` : '';
+        return apiRequest(`pedidos_ingrediente${q}`);
+    },
+
+    async createPedidoIngrediente(data) {
+        return apiRequest('pedidos_ingrediente', 'POST', data);
+    },
+
+    async updatePedidoIngrediente(id, data) {
+        return apiRequest(`pedidos_ingrediente/${id}`, 'PUT', data);
     }
 };
 

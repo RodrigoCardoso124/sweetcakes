@@ -234,6 +234,56 @@ class Auth
         return !empty($_SESSION['funcionario_id']);
     }
 
+    /**
+     * Admin de painel ou cargos elevados (gerente, etc.), com base na BD.
+     */
+    public static function isElevatedAdmin(PDO $db): bool
+    {
+        self::startSession();
+        if (!self::isLoggedIn()) {
+            return false;
+        }
+
+        $funcId = self::funcionarioId();
+        $pessoaId = self::pessoaId();
+
+        if ((int) $funcId === 13) {
+            return true;
+        }
+
+        if (!$funcId && !$pessoaId) {
+            return false;
+        }
+
+        $sql = 'SELECT f.funcionario_id, f.cargo FROM funcionarios f WHERE 1=1';
+        if ($funcId) {
+            $sql .= ' AND f.funcionario_id = :fid';
+        } else {
+            $sql .= ' AND f.pessoas_pessoa_id = :pid';
+        }
+        $sql .= ' LIMIT 1';
+
+        $stmt = $db->prepare($sql);
+        if ($funcId) {
+            $stmt->bindValue(':fid', (int) $funcId, PDO::PARAM_INT);
+        } else {
+            $stmt->bindValue(':pid', (int) $pessoaId, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        $func = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$func) {
+            return false;
+        }
+
+        $cargo = strtolower(trim((string) ($func['cargo'] ?? '')));
+        $cargo = str_replace(['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'], ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'], $cargo);
+        if (strpos($cargo, 'admin') !== false) {
+            return true;
+        }
+
+        return in_array($cargo, ['gerente', 'gestor', 'owner', 'dono', 'ceo'], true);
+    }
+
     public static function loginFromUserRow(
         array $userRow,
         array $pessoaRow,

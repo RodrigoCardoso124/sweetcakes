@@ -1029,5 +1029,151 @@ textarea:focus {
     .products-grid {
         grid-template-columns: 1fr;
     }
+
+    .recipe-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+/* Stock, produção, receitas (painel) */
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+@media (min-width: 640px) {
+    .form-row-2 {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.page-intro {
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+    max-width: 900px;
+}
+
+.admin-section {
+    margin-bottom: 28px;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    color: var(--secondary-color);
+}
+
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--card-bg);
+}
+
+.row-warn {
+    background: #fff8e6;
+}
+
+.stock-pill {
+    display: inline-block;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eef6ff;
+    margin-right: 6px;
+}
+
+.stock-pill--warn {
+    background: #fff3e0;
+    color: #b45309;
+}
+
+.stock-pill--muted {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.product-stock-row {
+    margin: 8px 0 10px;
+}
+
+.alert-banner {
+    background: #fff3e0;
+    border: 1px solid #f0d4a8;
+    color: #6b4f1d;
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+    font-size: 14px;
+}
+
+.cards-responsive {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.info-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+}
+
+.info-card h4 {
+    margin-bottom: 8px;
+}
+
+.muted {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.recipe-ing-list {
+    margin: 10px 0 12px 18px;
+    font-size: 14px;
+}
+
+.recipe-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.qty-input {
+    width: 88px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .header-actions .btn {
+        flex: 1;
+        min-width: 120px;
+    }
 }
 

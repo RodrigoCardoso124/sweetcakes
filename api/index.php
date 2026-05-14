@@ -176,6 +176,9 @@ $routes = [
     'utilizadores' => 'UtilizadorController',
     'promocoes' => 'PromocaoController',
     'fidelidade' => 'FidelidadeController',
+    'receitas' => 'ReceitaController',
+    'producao' => 'ProducaoController',
+    'pedidos_ingrediente' => 'PedidoIngredienteController',
 ];
 
 /**
@@ -218,7 +221,7 @@ function sc_is_public_api_route(?string $resource, string $method): bool
  */
 function sc_route_requires_admin(?string $resource, string $method): bool
 {
-    $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores'];
+    $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores', 'pedidos_ingrediente'];
     if ($resource === 'pessoas' && $method === 'POST') {
         return false;
     }
@@ -258,46 +261,7 @@ function sc_route_requires_admin(?string $resource, string $method): bool
  */
 function sc_is_elevated_admin(PDO $db): bool
 {
-    $funcId = Auth::funcionarioId();
-    $pessoaId = Auth::pessoaId();
-
-    if ($funcId === 13) {
-        return true;
-    }
-
-    if (!$funcId && !$pessoaId) {
-        return false;
-    }
-
-    $sql = "SELECT f.funcionario_id, f.cargo
-            FROM funcionarios f
-            WHERE 1=1";
-    if ($funcId) {
-        $sql .= " AND f.funcionario_id = :fid";
-    } elseif ($pessoaId) {
-        $sql .= " AND f.pessoas_pessoa_id = :pid";
-    }
-    $sql .= " LIMIT 1";
-
-    $stmt = $db->prepare($sql);
-    if ($funcId) {
-        $stmt->bindValue(':fid', (int) $funcId, PDO::PARAM_INT);
-    } elseif ($pessoaId) {
-        $stmt->bindValue(':pid', (int) $pessoaId, PDO::PARAM_INT);
-    }
-    $stmt->execute();
-    $func = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$func) {
-        return false;
-    }
-
-    $cargo = strtolower(trim((string) ($func['cargo'] ?? '')));
-    $cargo = str_replace(['á', 'à', 'â', 'ã', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'], ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'], $cargo);
-    if (strpos($cargo, 'admin') !== false) {
-        return true;
-    }
-
-    return in_array($cargo, ['gerente', 'gestor', 'owner', 'dono', 'ceo'], true);
+    return Auth::isElevatedAdmin($db);
 }
 
 if ($resource === 'login' && $httpMethod === 'POST') {
