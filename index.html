@@ -10,14 +10,13 @@
 </head>
 <body data-page-scope="employee">
     <div class="admin-container">
-        <!-- Sidebar -->
         <aside class="sidebar" id="admin-sidebar">
             <div class="sidebar-header">
                 <h1>🍰 Sweet Cakes</h1>
                 <p>Painel Administrativo</p>
             </div>
             <nav class="sidebar-nav">
-                <a href="index.html" class="nav-item">
+                <a href="index.html" class="nav-item active">
                     <span class="icon">📦</span>
                     <span>Encomendas</span>
                 </a>
@@ -59,12 +58,14 @@
             </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="header">
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <main class="main-content main-content--dashboard">
+            <header class="header header--dashboard">
+                <div class="header-title-block">
                     <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
-                    <h2>Gestão de Encomendas</h2>
+                    <div>
+                        <h2>Encomendas</h2>
+                        <p class="header-subtitle">Fila de trabalho e histórico separados para trabalhares sem ruído.</p>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <button type="button" id="exportCsvBtn" class="btn btn-secondary">⬇ CSV</button>
@@ -72,107 +73,137 @@
                 </div>
             </header>
 
-            <!-- Filters -->
-            <div class="filters">
-                <select id="statusFilter" class="filter-select">
-                    <option value="">Todos os estados</option>
-                    <option value="pendente">Pendente</option>
-                    <option value="aceite">Aceite</option>
-                    <option value="em_preparacao">Em Preparação</option>
-                    <option value="pronta">Pronta</option>
-                    <option value="entregue">Entregue</option>
-                    <option value="cancelada">Cancelada</option>
-                </select>
-                <input type="text" id="searchInput" class="search-input" placeholder="🔍 Pesquisar por ID ou cliente...">
+            <div class="dashboard-tabs" role="tablist" aria-label="Vista de encomendas">
+                <button type="button" class="dash-tab active" data-dash-view="operacao" role="tab" aria-selected="true" id="tabOperacao">Operação</button>
+                <button type="button" class="dash-tab" data-dash-view="historico" role="tab" aria-selected="false" id="tabHistorico">Histórico</button>
             </div>
 
-            <!-- Stats Cards -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">⏳</div>
-                    <div class="stat-info">
-                        <h3 id="pendingCount">0</h3>
-                        <p>Pendentes</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">✅</div>
-                    <div class="stat-info">
-                        <h3 id="acceptedCount">0</h3>
-                        <p>Aceites</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">👨‍🍳</div>
-                    <div class="stat-info">
-                        <h3 id="preparingCount">0</h3>
-                        <p>Em Preparação</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">📦</div>
-                    <div class="stat-info">
-                        <h3 id="readyCount">0</h3>
-                        <p>Prontas</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">🚚</div>
-                    <div class="stat-info">
-                        <h3 id="deliveredCount">0</h3>
-                        <p>Entregues</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">⛔</div>
-                    <div class="stat-info">
-                        <h3 id="cancelledCount">0</h3>
-                        <p>Canceladas</p>
-                    </div>
-                </div>
-            </div>
+            <section id="dashPanelOperacao" class="dash-panel" aria-labelledby="tabOperacao">
+                <p class="page-intro">Aqui aparecem só encomendas <strong>em curso</strong> (pendente → pronta). Altera estados e abre o detalhe sem misturar encomendas já fechadas.</p>
 
-            <!-- Orders Table -->
-            <div class="table-container">
-                <table class="orders-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Cliente</th>
-                            <th>Total</th>
-                            <th>Estado</th>
-                            <th>Data</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ordersTableBody">
-                        <tr>
-                            <td colspan="6" class="loading">Carregando encomendas...</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div id="encomendasPagination" class="pagination"></div>
-            </div>
+                <div class="filters-toolbar">
+                    <select id="statusFilter" class="filter-select" aria-label="Filtrar por estado"></select>
+                    <input type="search" id="searchInput" class="search-input" placeholder="Pesquisar por ID ou cliente…" autocomplete="off">
+                </div>
+
+                <div class="stats-grid stats-grid--pipeline">
+                    <div class="stat-card stat-card--compact">
+                        <div class="stat-icon" aria-hidden="true">⏳</div>
+                        <div class="stat-info">
+                            <h3 id="pendingCount">0</h3>
+                            <p>Pendentes</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card--compact">
+                        <div class="stat-icon" aria-hidden="true">✅</div>
+                        <div class="stat-info">
+                            <h3 id="acceptedCount">0</h3>
+                            <p>Aceites</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card--compact">
+                        <div class="stat-icon" aria-hidden="true">👨‍🍳</div>
+                        <div class="stat-info">
+                            <h3 id="preparingCount">0</h3>
+                            <p>Em preparação</p>
+                        </div>
+                    </div>
+                    <div class="stat-card stat-card--compact">
+                        <div class="stat-icon" aria-hidden="true">📦</div>
+                        <div class="stat-info">
+                            <h3 id="readyCount">0</h3>
+                            <p>Prontas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="table-card__head">
+                        <h3 class="table-card__title">Fila de trabalho</h3>
+                        <span class="table-card__hint">Ordenação: mais recentes primeiro</span>
+                    </div>
+                    <div class="table-container table-container--flush">
+                        <table class="orders-table orders-table--dashboard">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cliente</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Data</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                                <tr>
+                                    <td colspan="6" class="loading">Carregando encomendas…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div id="encomendasPagination" class="pagination"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="dashPanelHistorico" class="dash-panel dash-panel--hidden" aria-labelledby="tabHistorico" hidden>
+                <p class="page-intro">Encomendas <strong>entregues</strong> ou <strong>canceladas</strong>. Consulta, exporta CSV ou abre o detalhe; o dia-a-dia fica no separador Operação.</p>
+
+                <div class="history-summary-bar">
+                    <div class="history-pill history-pill--ok">
+                        <span class="history-pill__label">Entregues</span>
+                        <span class="history-pill__value" id="deliveredCount">0</span>
+                    </div>
+                    <div class="history-pill history-pill--muted">
+                        <span class="history-pill__label">Canceladas</span>
+                        <span class="history-pill__value" id="cancelledCount">0</span>
+                    </div>
+                </div>
+
+                <div class="filters-toolbar">
+                    <select id="statusFilterHistorico" class="filter-select" aria-label="Estado no histórico"></select>
+                    <input type="search" id="searchInputHistorico" class="search-input" placeholder="Pesquisar por ID ou cliente…" autocomplete="off">
+                </div>
+
+                <div class="table-card">
+                    <div class="table-card__head">
+                        <h3 class="table-card__title">Histórico</h3>
+                        <span class="table-card__hint">Arquivo de encomendas concluídas</span>
+                    </div>
+                    <div class="table-container table-container--flush">
+                        <table class="orders-table orders-table--dashboard">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cliente</th>
+                                    <th>Total</th>
+                                    <th>Estado</th>
+                                    <th>Data</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBodyHistorico">
+                                <tr>
+                                    <td colspan="6" class="loading">Carregando…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div id="encomendasPaginationHistorico" class="pagination"></div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
-    <!-- Modal para mudar estado -->
-    <div id="statusModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h3>Alterar Estado da Encomenda</h3>
-            <p>Encomenda #<span id="modalOrderId"></span></p>
-            <select id="newStatusSelect" class="form-select">
-                <option value="pendente">Pendente</option>
-                <option value="aceite">Aceite</option>
-                <option value="em_preparacao">Em Preparação</option>
-                <option value="pronta">Pronta</option>
-                <option value="entregue">Entregue</option>
-                <option value="cancelada">Cancelada</option>
-            </select>
+    <div id="statusModal" class="modal modal--dashboard" role="dialog" aria-modal="true" aria-labelledby="statusModalTitle">
+        <div class="modal-content modal-content--compact">
+            <span class="close" role="button" tabindex="0" aria-label="Fechar">&times;</span>
+            <h3 id="statusModalTitle">Alterar estado</h3>
+            <p class="modal-lead">Encomenda <span class="modal-order-id">#<span id="modalOrderId"></span></span></p>
+            <label class="modal-field-label" for="newStatusSelect">Novo estado</label>
+            <select id="newStatusSelect" class="form-select"></select>
             <div class="modal-actions">
-                <button id="confirmStatusBtn" class="btn btn-primary">Confirmar</button>
-                <button id="cancelStatusBtn" class="btn btn-secondary">Cancelar</button>
+                <button id="cancelStatusBtn" type="button" class="btn btn-secondary">Cancelar</button>
+                <button id="confirmStatusBtn" type="button" class="btn btn-primary">Guardar</button>
             </div>
         </div>
     </div>
@@ -182,4 +213,3 @@
     <script src="app.js"></script>
 </body>
 </html>
-

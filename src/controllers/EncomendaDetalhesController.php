@@ -3,6 +3,7 @@ include_once __DIR__ . '/../models/EncomendaDetalhes.php';
 include_once __DIR__ . '/../models/Encomenda.php';
 include_once __DIR__ . '/../models/Produto.php';
 require_once __DIR__ . '/../helpers/Auth.php';
+require_once __DIR__ . '/../helpers/EncomendaStockHelper.php';
 
 class EncomendaDetalheController
 {
@@ -97,9 +98,16 @@ class EncomendaDetalheController
 
         $this->encomenda->encomenda_id = $data['encomenda_id'];
         $stmt = $this->encomenda->getById();
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+        $encRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$encRow) {
             http_response_code(400);
             echo json_encode(['message' => 'Encomenda não existe']);
+
+            return;
+        }
+        if (strtolower((string) ($encRow['estado'] ?? '')) === 'cancelada') {
+            http_response_code(400);
+            echo json_encode(['message' => 'Não é possível adicionar linhas a uma encomenda cancelada']);
 
             return;
         }
@@ -113,15 +121,37 @@ class EncomendaDetalheController
             return;
         }
 
+        $qtyInt = EncomendaStockHelper::quantidadeParaInt($data['quantidade']);
         $this->detalhe->encomenda_id = $data['encomenda_id'];
         $this->detalhe->produto_id = $data['produto_id'];
         $this->detalhe->quantidade = $data['quantidade'];
         $this->detalhe->especifico = $data['especifico'];
 
-        if ($this->detalhe->create()) {
+        try {
+            $this->db->beginTransaction();
+            $chk = EncomendaStockHelper::tentarDescontarStock($this->db, (int) $data['produto_id'], $qtyInt);
+            if (!$chk['ok']) {
+                $this->db->rollBack();
+                http_response_code(409);
+                echo json_encode(['message' => $chk['message'] ?? 'Stock insuficiente']);
+
+                return;
+            }
+            if (!$this->detalhe->create()) {
+                $this->db->rollBack();
+                http_response_code(500);
+                echo json_encode(['message' => 'Erro ao criar detalhe']);
+
+                return;
+            }
+            $this->db->commit();
             http_response_code(201);
             echo json_encode(['message' => 'Detalhe criado com sucesso']);
-        } else {
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[EncomendaDetalhe::store] '.$e->getMessage());
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao criar detalhe']);
         }
@@ -158,14 +188,53 @@ class EncomendaDetalheController
             }
         }
 
-        $this->detalhe->encomenda_id = $data['encomenda_id'] ?? null;
-        $this->detalhe->produto_id = $data['produto_id'] ?? null;
-        $this->detalhe->quantidade = $data['quantidade'] ?? null;
-        $this->detalhe->especifico = $data['especifico'] ?? null;
+        $oldPid = (int) ($existing['produto_id'] ?? 0);
+        $oldQ = EncomendaStockHelper::quantidadeParaInt($existing['quantidade'] ?? 0);
+        $newPid = isset($data['produto_id']) ? (int) $data['produto_id'] : $oldPid;
+        $newQ = isset($data['quantidade'])
+            ? EncomendaStockHelper::quantidadeParaInt($data['quantidade'])
+            : $oldQ;
 
-        if ($this->detalhe->update()) {
+        $this->detalhe->encomenda_id = $data['encomenda_id'] ?? $existing['encomenda_id'];
+        $this->detalhe->produto_id = $data['produto_id'] ?? $existing['produto_id'];
+        $this->detalhe->quantidade = $data['quantidade'] ?? $existing['quantidade'];
+        $this->detalhe->especifico = $data['especifico'] ?? $existing['especifico'];
+
+        $eid = (int) ($existing['encomenda_id'] ?? 0);
+        $jaCancelada = EncomendaStockHelper::encomendaEstaCancelada($this->db, $eid);
+        $stockMuda = !$jaCancelada && ($newPid !== $oldPid || $newQ !== $oldQ);
+
+        try {
+            if ($stockMuda) {
+                $this->db->beginTransaction();
+                EncomendaStockHelper::reporStock($this->db, $oldPid, $oldQ);
+                $chk = EncomendaStockHelper::tentarDescontarStock($this->db, $newPid, $newQ);
+                if (!$chk['ok']) {
+                    $this->db->rollBack();
+                    http_response_code(409);
+                    echo json_encode(['message' => $chk['message'] ?? 'Stock insuficiente']);
+
+                    return;
+                }
+            }
+            if (!$this->detalhe->update()) {
+                if ($stockMuda && $this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                http_response_code(500);
+                echo json_encode(['message' => 'Erro ao atualizar detalhe']);
+
+                return;
+            }
+            if ($stockMuda && $this->db->inTransaction()) {
+                $this->db->commit();
+            }
             echo json_encode(['message' => 'Detalhe atualizado com sucesso']);
-        } else {
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[EncomendaDetalhe::update] '.$e->getMessage());
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao atualizar detalhe']);
         }
@@ -189,9 +258,30 @@ class EncomendaDetalheController
             return;
         }
 
-        if ($this->detalhe->delete()) {
+        $pid = (int) ($existing['produto_id'] ?? 0);
+        $qty = EncomendaStockHelper::quantidadeParaInt($existing['quantidade'] ?? 0);
+        $eid = (int) ($existing['encomenda_id'] ?? 0);
+        $jaCancelada = EncomendaStockHelper::encomendaEstaCancelada($this->db, $eid);
+
+        try {
+            $this->db->beginTransaction();
+            if (!$jaCancelada) {
+                EncomendaStockHelper::reporStock($this->db, $pid, $qty);
+            }
+            if (!$this->detalhe->delete()) {
+                $this->db->rollBack();
+                http_response_code(500);
+                echo json_encode(['message' => 'Erro ao remover detalhe']);
+
+                return;
+            }
+            $this->db->commit();
             echo json_encode(['message' => 'Detalhe removido com sucesso']);
-        } else {
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[EncomendaDetalhe::destroy] '.$e->getMessage());
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao remover detalhe']);
         }

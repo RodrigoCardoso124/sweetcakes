@@ -7,6 +7,7 @@ include_once __DIR__ . '/../models/FidelidadePontos.php';
 require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/AuditHelper.php';
 require_once __DIR__ . '/../helpers/PromocaoHelper.php';
+require_once __DIR__ . '/../helpers/EncomendaStockHelper.php';
 
 class EncomendaController
 {
@@ -249,8 +250,39 @@ class EncomendaController
 
             if (isset($data['estado']) && $data['estado'] !== null && trim((string) $data['estado']) !== '') {
                 $novoEstado = trim((string) $data['estado']);
-                $this->encomenda->estado = $novoEstado;
-                $result = $this->encomenda->updateEstado();
+                $oldE = strtolower(trim((string) ($encomendaAtual['estado'] ?? '')));
+                $newE = strtolower($novoEstado);
+
+                $this->db->beginTransaction();
+                try {
+                    $this->encomenda->estado = $novoEstado;
+                    $result = $this->encomenda->updateEstado();
+                    if ($result !== true) {
+                        $this->db->rollBack();
+                    } else {
+                        if ($newE === 'cancelada' && $oldE !== 'cancelada') {
+                            EncomendaStockHelper::reporTodasLinhasEncomenda($this->db, (int) $id);
+                        } elseif ($oldE === 'cancelada' && $newE !== 'cancelada') {
+                            $errStock = EncomendaStockHelper::descontarTodasLinhasEncomenda($this->db, (int) $id);
+                            if ($errStock !== null) {
+                                $this->db->rollBack();
+                                if (ob_get_level() > 0) {
+                                    ob_clean();
+                                }
+                                http_response_code(409);
+                                echo json_encode(['message' => $errStock]);
+
+                                return;
+                            }
+                        }
+                        $this->db->commit();
+                    }
+                } catch (Throwable $e) {
+                    if ($this->db->inTransaction()) {
+                        $this->db->rollBack();
+                    }
+                    throw $e;
+                }
             } else {
                 if (ob_get_level() > 0) {
                     ob_clean();
@@ -372,10 +404,36 @@ class EncomendaController
     public function destroy($id)
     {
         $this->encomenda->encomenda_id = $id;
+        $stmt = $this->encomenda->getById();
+        $rowEnc = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$rowEnc) {
+            http_response_code(404);
+            echo json_encode(['message' => 'Encomenda não encontrada']);
 
-        if ($this->encomenda->delete()) {
+            return;
+        }
+
+        $jaCancelada = strtolower(trim((string) ($rowEnc['estado'] ?? ''))) === 'cancelada';
+
+        try {
+            $this->db->beginTransaction();
+            if (!$jaCancelada) {
+                EncomendaStockHelper::reporTodasLinhasEncomenda($this->db, (int) $id);
+            }
+            if (!$this->encomenda->delete()) {
+                $this->db->rollBack();
+                http_response_code(500);
+                echo json_encode(['message' => 'Erro ao remover encomenda']);
+
+                return;
+            }
+            $this->db->commit();
             echo json_encode(['message' => 'Encomenda removida com sucesso']);
-        } else {
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[EncomendaController::destroy] '.$e->getMessage());
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao remover encomenda']);
         }
