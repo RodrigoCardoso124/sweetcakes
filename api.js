@@ -235,12 +235,23 @@ const API = {
         if (imageFile) {
             const formData = new FormData();
             if (data.nome) formData.append('nome', data.nome);
-            if (data.descricao) formData.append('descricao', data.descricao);
-            if (data.preco) formData.append('preco', data.preco);
-            if (data.disponivel !== undefined) formData.append('disponivel', data.disponivel);
-            if (data.stock_atual !== undefined) formData.append('stock_atual', String(data.stock_atual));
-            if (data.stock_minimo !== undefined) formData.append('stock_minimo', String(data.stock_minimo));
+            if (data.descricao !== undefined && data.descricao !== null) {
+                formData.append('descricao', data.descricao);
+            }
+            if (data.preco !== undefined && data.preco !== null && data.preco !== '') {
+                formData.append('preco', String(data.preco));
+            }
+            if (data.disponivel !== undefined && data.disponivel !== null) {
+                formData.append('disponivel', String(data.disponivel));
+            }
+            formData.append('stock_atual', String(data.stock_atual != null ? data.stock_atual : 0));
+            formData.append('stock_minimo', String(data.stock_minimo != null ? data.stock_minimo : 0));
+            if (data.alergenios !== undefined && data.alergenios !== null) {
+                formData.append('alergenios', String(data.alergenios));
+            }
             formData.append('imagem', imageFile);
+            // PUT + multipart em muitos servidores não preenche $_POST; POST com _method=PUT sim.
+            formData.append('_method', 'PUT');
 
             const sessionId = localStorage.getItem('apiSessionId');
             const token = localStorage.getItem('adminToken') || sessionId;
@@ -249,7 +260,7 @@ const API = {
             if (token) headers['Authorization'] = 'Bearer ' + token;
 
             const response = await fetch(`${API_BASE_URL}/produtos/${id}`, {
-                method: 'PUT',
+                method: 'POST',
                 headers,
                 body: formData
             });

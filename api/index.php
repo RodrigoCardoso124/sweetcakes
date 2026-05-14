@@ -435,10 +435,12 @@ try {
                 echo json_encode(['error' => 'ID obrigatório']);
                 break;
             }
+            // JSON (php://input) + campos POST (ex.: POST multipart com _method=PUT) — PUT puro com multipart muitas vezes não preenche $_POST.
+            $putData = array_merge($_POST, is_array($input) ? $input : []);
             if (!empty($files)) {
-                $controller->update($id, $_POST, $files);
+                $controller->update($id, $putData, $files);
             } else {
-                $controller->update($id, $input ?? []);
+                $controller->update($id, $putData);
             }
             break;
 
