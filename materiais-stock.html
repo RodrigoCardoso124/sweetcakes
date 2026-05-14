@@ -101,6 +101,7 @@
                                 <th>ID</th>
                                 <th>Material</th>
                                 <th>Qtd</th>
+                                <th>Email forn.</th>
                                 <th>Estado</th>
                                 <th>Data</th>
                                 <th></th>
@@ -126,6 +127,11 @@
             <div class="form-group">
                 <label>Notas (opcional)</label>
                 <input type="text" id="pedNotas" maxlength="500">
+            </div>
+            <div class="form-group">
+                <label for="pedEmailFornecedor">Email do fornecedor (opcional)</label>
+                <input type="email" id="pedEmailFornecedor" maxlength="255" placeholder="fornecedor@exemplo.com" autocomplete="off">
+                <small class="muted">Se preencheres, enviamos o pedido por email (SMTP configurado no servidor).</small>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-primary" id="pedSave">Registar pedido</button>

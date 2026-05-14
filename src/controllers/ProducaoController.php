@@ -4,6 +4,7 @@ require_once __DIR__ . '/../models/Produto.php';
 require_once __DIR__ . '/../models/Receita.php';
 require_once __DIR__ . '/../models/Ingredientes.php';
 require_once __DIR__ . '/../helpers/Auth.php';
+require_once __DIR__ . '/../helpers/stock_alert_mail.php';
 
 class ProducaoController
 {
@@ -194,6 +195,7 @@ class ProducaoController
             return;
         }
 
+        $ingBeforeQty = [];
         foreach ($linhas as $ln) {
             $iid = (int) $ln['ingrediente_id'];
             $need = (float) $ln['quantidade'] * $vezes;
@@ -206,6 +208,7 @@ class ProducaoController
                 return;
             }
             $atual = (float) ($row['quantidade_atual'] ?? 0);
+            $ingBeforeQty[$iid] = $atual;
             if ($atual + 1e-9 < $need) {
                 http_response_code(400);
                 echo json_encode([
@@ -233,6 +236,34 @@ class ProducaoController
             $this->produto->incrementStock($prodOut, $unidades);
             $this->logProducao('receita', $rid, $prodOut, $unidades, $vezes);
             $this->db->commit();
+
+            // Alertas de matéria (só admins): após consumo, se algum ingrediente entrou em stock baixo.
+            $seenIng = [];
+            foreach ($linhas as $ln) {
+                $iid = (int) $ln['ingrediente_id'];
+                if (isset($seenIng[$iid])) {
+                    continue;
+                }
+                $seenIng[$iid] = true;
+                $before = (float) ($ingBeforeQty[$iid] ?? 0);
+                $this->ingrediente->ingrediente_id = $iid;
+                $rowAfter = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
+                if (!$rowAfter) {
+                    continue;
+                }
+                $after = (float) ($rowAfter['quantidade_atual'] ?? 0);
+                $min = (float) ($rowAfter['quantidade_minima'] ?? 0);
+                if (sc_ingredient_entered_low($before, $after, $min)) {
+                    sc_stock_mail_notify_admins_ingredient_low(
+                        $this->db,
+                        (string) ($rowAfter['nome'] ?? ''),
+                        $after,
+                        $min,
+                        (string) ($rowAfter['unidade'] ?? '')
+                    );
+                }
+            }
+
             echo json_encode([
                 'message' => 'Receita executada',
                 'receita_id' => $rid,

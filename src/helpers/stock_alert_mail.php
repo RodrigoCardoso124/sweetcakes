@@ -17,7 +17,20 @@ function sc_stock_is_low($atual, $min): bool
 }
 
 /**
- * Ingrediente: transição para stock baixo (antes acima do mínimo, agora em ou abaixo).
+ * Ingrediente: transição para stock baixo considerando mínimo antes e depois (ex.: alteração do mínimo).
+ */
+function sc_ingredient_entered_low_state(array $beforeRow, array $afterRow): bool
+{
+    $bA = (float) ($beforeRow['quantidade_atual'] ?? 0);
+    $bM = (float) ($beforeRow['quantidade_minima'] ?? 0);
+    $aA = (float) ($afterRow['quantidade_atual'] ?? 0);
+    $aM = (float) ($afterRow['quantidade_minima'] ?? 0);
+
+    return !sc_stock_is_low($bA, $bM) && sc_stock_is_low($aA, $aM);
+}
+
+/**
+ * Ingrediente: transição para stock baixo (mesmo mínimo — ex. consumo na receita).
  */
 function sc_ingredient_entered_low(float $beforeAtual, float $afterAtual, float $min): bool
 {

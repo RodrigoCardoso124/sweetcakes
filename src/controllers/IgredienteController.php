@@ -48,10 +48,8 @@ class IgredienteController {
         $this->ingrediente->quantidade_minima = $data['quantidade_minima'];
 
         if ($this->ingrediente->create()) {
-            $this->ingrediente->ingrediente_id = (int) $this->ingrediente->lastInsertId();
-            if ($this->ingrediente->ingrediente_id <= 0) {
-                $this->ingrediente->ingrediente_id = (int) $this->db->lastInsertId();
-            }
+            $newId = $this->ingrediente->lastInsertId();
+            $this->ingrediente->ingrediente_id = $newId;
             $row = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
             if ($row && sc_stock_is_low((float) ($row['quantidade_atual'] ?? 0), (float) ($row['quantidade_minima'] ?? 0))) {
                 sc_stock_mail_notify_admins_ingredient_low(
@@ -74,6 +72,13 @@ class IgredienteController {
 
     public function update($id, $data) {
         $this->ingrediente->ingrediente_id = $id;
+        $stmtBefore = $this->ingrediente->getById();
+        $before = $stmtBefore->fetch(PDO::FETCH_ASSOC);
+        if (!$before) {
+            http_response_code(404);
+            echo json_encode(["message" => "Ingrediente não encontrado"]);
+            return;
+        }
 
         $this->ingrediente->nome = $data['nome'] ?? null;
         $this->ingrediente->quantidade_atual = $data['quantidade_atual'] ?? null;
@@ -81,6 +86,17 @@ class IgredienteController {
         $this->ingrediente->quantidade_minima = $data['quantidade_minima'] ?? null;
 
         if ($this->ingrediente->update()) {
+            $this->ingrediente->ingrediente_id = $id;
+            $after = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
+            if ($after && sc_ingredient_entered_low_state($before, $after)) {
+                sc_stock_mail_notify_admins_ingredient_low(
+                    $this->db,
+                    (string) ($after['nome'] ?? ''),
+                    (float) ($after['quantidade_atual'] ?? 0),
+                    (float) ($after['quantidade_minima'] ?? 0),
+                    (string) ($after['unidade'] ?? '')
+                );
+            }
             echo json_encode(["message" => "Ingrediente atualizado com sucesso"]);
         } else {
             http_response_code(500);

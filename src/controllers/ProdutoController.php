@@ -2,6 +2,7 @@
 include_once __DIR__ . "/../models/Produto.php";
 include_once __DIR__ . "/../models/ProdutoIngrediente.php";
 include_once __DIR__ . "/../models/Ingredientes.php";
+require_once __DIR__ . '/../helpers/stock_alert_mail.php';
 
 class ProdutoController {
     private $db;
@@ -338,6 +339,11 @@ class ProdutoController {
         $this->produto->alergenios = $this->normalizarAlergeniosParaGuardar($data['alergenios'] ?? null);
 
         if ($this->produto->create()) {
+            $sa = (int) $this->produto->stock_atual;
+            $sm = (int) $this->produto->stock_minimo;
+            if (sc_produto_should_notify_funcionarios(true, 0, 0, $sa, $sm)) {
+                sc_stock_mail_notify_funcionarios_produto_low($this->db, (string) $this->produto->nome, $sa, $sm);
+            }
             http_response_code(201);
             echo json_encode(["message" => "Produto criado com sucesso"]);
         } else {
@@ -394,6 +400,13 @@ class ProdutoController {
             : ($produtoAtual['alergenios'] ?? null);
 
         if ($this->produto->update()) {
+            $saPrev = (int) ($produtoAtual['stock_atual'] ?? 0);
+            $smPrev = (int) ($produtoAtual['stock_minimo'] ?? 0);
+            $saNew = (int) $this->produto->stock_atual;
+            $smNew = (int) $this->produto->stock_minimo;
+            if (sc_produto_should_notify_funcionarios(false, $saPrev, $smPrev, $saNew, $smNew)) {
+                sc_stock_mail_notify_funcionarios_produto_low($this->db, (string) $this->produto->nome, $saNew, $smNew);
+            }
             echo json_encode(["message" => "Produto atualizado com sucesso"]);
         } else {
             http_response_code(500);

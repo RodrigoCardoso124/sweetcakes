@@ -150,6 +150,7 @@ function renderIng(list) {
       document.getElementById('pedIngNome').textContent = ing ? ing.nome : '';
       document.getElementById('pedQ').value = '';
       document.getElementById('pedNotas').value = '';
+      document.getElementById('pedEmailFornecedor').value = '';
       document.getElementById('pedModal').classList.add('active');
     });
   });
@@ -159,13 +160,27 @@ async function savePed() {
   const id = parseInt(document.getElementById('pedIngId').value, 10);
   const q = parseFloat(document.getElementById('pedQ').value);
   const notas = document.getElementById('pedNotas').value.trim();
+  const emailFornecedor = document.getElementById('pedEmailFornecedor').value.trim();
   if (!id || !(q > 0)) {
     showToast('Quantidade inválida', 'warning');
     return;
   }
   try {
-    await API.createPedidoIngrediente({ ingrediente_id: id, quantidade: q, notas: notas || null });
+    const payload = { ingrediente_id: id, quantidade: q, notas: notas || null };
+    if (emailFornecedor) payload.email_fornecedor = emailFornecedor;
+    const res = await API.createPedidoIngrediente(payload);
     showToast('Pedido registado', 'success');
+    if (res && res.email_pedido && typeof showToast === 'function') {
+      const ep = res.email_pedido;
+      if (ep.fornecedor && ep.fornecedor.ok) showToast('Email ao fornecedor enviado.', 'success');
+      else if (ep.fornecedor && ep.fornecedor.motivo && ep.fornecedor.motivo !== 'omitido') {
+        showToast('Email fornecedor: ' + (ep.fornecedor.motivo === 'email_destino_invalido' ? 'email inválido' : ep.fornecedor.motivo), 'warning');
+      }
+      if (ep.admins && ep.admins.sent > 0) showToast('Aviso enviado a ' + ep.admins.sent + ' admin(s).', 'info');
+      else if (ep.admins && ep.admins.last_result && ep.admins.last_result.motivo === 'sem_destinatarios') {
+        showToast('Nenhum email de admin/gestor na base de dados para aviso.', 'warning');
+      }
+    }
     closePed();
     load();
   } catch (e) {
@@ -184,6 +199,8 @@ function renderPed(list) {
         escapeHtml(p.ingrediente_nome || '') +
         '</td><td>' +
         p.quantidade +
+        '</td><td>' +
+        escapeHtml(p.email_fornecedor || '—') +
         '</td><td>' +
         escapeHtml(p.estado) +
         '</td><td>' +
