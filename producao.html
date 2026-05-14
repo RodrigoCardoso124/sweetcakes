@@ -69,12 +69,13 @@
                 </div>
             </header>
 
-            <p class="page-intro">Regista unidades produzidas manualmente ou executa uma receita em lote (consome matérias e aumenta o stock do produto).</p>
+            <p class="page-intro" id="producaoIntro">Executa uma receita em lote: o sistema desconta as matérias-primas e aumenta o stock do produto automaticamente.</p>
 
             <div id="alertBanner" class="alert-banner" style="display:none;"></div>
 
-            <section class="admin-section">
-                <h3 class="section-title">Stock de produtos</h3>
+            <section class="admin-section" id="secProdutosManual" style="display:none;">
+                <h3 class="section-title">Stock de produtos (ajuste manual)</h3>
+                <p class="muted" style="margin-bottom:12px;">Reservado a administradores — registo pontual de unidades sem receita.</p>
                 <div class="table-wrap">
                     <table class="orders-table" id="tblProdutos">
                         <thead>

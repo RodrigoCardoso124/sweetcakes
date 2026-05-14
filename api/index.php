@@ -241,6 +241,10 @@ function sc_route_requires_admin(?string $resource, string $method): bool
         // Criar/editar/apagar promoções requer painel admin.
         return true;
     }
+    if ($resource === 'receitas') {
+        // Definição e leitura de receitas: só admin/gestor (matérias vêm da BD).
+        return true;
+    }
     if ($resource === 'encomendas' && $method === 'DELETE') {
         return true;
     }

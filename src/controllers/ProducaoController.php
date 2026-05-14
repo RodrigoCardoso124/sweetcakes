@@ -58,20 +58,22 @@ class ProducaoController
             }
         }
 
-        $stmtIng = $this->ingrediente->getAll();
-        $ings = $stmtIng->fetchAll(PDO::FETCH_ASSOC);
         $alertasIngrediente = [];
-        foreach ($ings as $i) {
-            $qa = (float) ($i['quantidade_atual'] ?? 0);
-            $qm = (float) ($i['quantidade_minima'] ?? 0);
-            if ($qm > 0 && $qa <= $qm) {
-                $alertasIngrediente[] = [
-                    'ingrediente_id' => (int) $i['ingrediente_id'],
-                    'nome' => $i['nome'],
-                    'quantidade_atual' => $qa,
-                    'quantidade_minima' => $qm,
-                    'unidade' => $i['unidade'] ?? '',
-                ];
+        if (Auth::isElevatedAdmin($this->db)) {
+            $stmtIng = $this->ingrediente->getAll();
+            $ings = $stmtIng->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($ings as $i) {
+                $qa = (float) ($i['quantidade_atual'] ?? 0);
+                $qm = (float) ($i['quantidade_minima'] ?? 0);
+                if ($qm > 0 && $qa <= $qm) {
+                    $alertasIngrediente[] = [
+                        'ingrediente_id' => (int) $i['ingrediente_id'],
+                        'nome' => $i['nome'],
+                        'quantidade_atual' => $qa,
+                        'quantidade_minima' => $qm,
+                        'unidade' => $i['unidade'] ?? '',
+                    ];
+                }
             }
         }
 
@@ -107,6 +109,12 @@ class ProducaoController
         }
         $action = trim((string) ($data['action'] ?? ''));
         if ($action === 'incrementar_produto') {
+            if (!Auth::isElevatedAdmin($this->db)) {
+                http_response_code(403);
+                echo json_encode(['message' => 'Só administradores podem alterar o stock de produtos manualmente. Usa «Executar receita» para produção.']);
+
+                return;
+            }
             $this->incrementarProduto($data);
             return;
         }

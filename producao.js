@@ -1,9 +1,40 @@
 /* global API, initAdminShell, showToast */
 
-document.addEventListener('DOMContentLoaded', () => {
+function isElevatedPainel() {
+  return localStorage.getItem('adminIsAdmin') === 'true';
+}
+
+async function refreshRoleFromServer() {
+  if (typeof API === 'undefined' || !API.getSessionInfo) return;
+  try {
+    const s = await API.getSessionInfo();
+    if (s && s.logged_in) {
+      localStorage.setItem('adminIsAdmin', s.is_admin ? 'true' : 'false');
+      localStorage.setItem('adminFuncionarioId', String(s.funcionario_id || ''));
+    }
+  } catch (e) {}
+}
+
+function applyProducaoIntroAndSections() {
+  const intro = document.getElementById('producaoIntro');
+  const sec = document.getElementById('secProdutosManual');
+  const elevated = isElevatedPainel();
+  if (intro) {
+    intro.textContent = elevated
+      ? 'Executa receitas em lote (desconta matérias e aumenta stock do produto) ou, se precisares, regista manualmente unidades extra (só admin).'
+      : 'Executa uma receita em lote: o sistema desconta as matérias-primas e aumenta o stock do produto automaticamente. O stock manual só pode ser alterado por um administrador.';
+  }
+  if (sec) {
+    sec.style.display = elevated ? '' : 'none';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
   if (typeof initAdminShell === 'function') {
     if (initAdminShell() === false) return;
   }
+  await refreshRoleFromServer();
+  applyProducaoIntroAndSections();
   document.getElementById('refreshBtn').addEventListener('click', loadAll);
   loadAll();
 });
@@ -54,6 +85,11 @@ function renderAlerts(d) {
 
 function renderProdutos(list) {
   const tb = document.querySelector('#tblProdutos tbody');
+  if (!tb) return;
+  if (!isElevatedPainel()) {
+    tb.innerHTML = '';
+    return;
+  }
   tb.innerHTML = list
     .map((p) => {
       const id = p.produto_id;

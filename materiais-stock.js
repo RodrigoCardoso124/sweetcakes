@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
     if (initAdminShell() === false) return;
   }
+  document.getElementById('novoIngBtn').addEventListener('click', criarIngrediente);
   document.getElementById('refreshBtn').addEventListener('click', load);
   document.getElementById('pedClose').addEventListener('click', closePed);
   document.getElementById('pedCancel').addEventListener('click', closePed);
@@ -18,6 +19,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function closePed() {
   document.getElementById('pedModal').classList.remove('active');
+}
+
+async function criarIngrediente() {
+  const nome = document.getElementById('novoIngNome').value.trim();
+  const unidade = document.getElementById('novoIngUnidade').value.trim();
+  const quantidade_atual = parseFloat(document.getElementById('novoIngAtual').value);
+  const quantidade_minima = parseFloat(document.getElementById('novoIngMin').value);
+  if (!nome) {
+    showToast('Indica o nome do material', 'warning');
+    return;
+  }
+  if (!unidade) {
+    showToast('Indica a unidade (kg, g, L…)', 'warning');
+    return;
+  }
+  if (Number.isNaN(quantidade_atual) || quantidade_atual < 0) {
+    showToast('Stock inicial inválido', 'warning');
+    return;
+  }
+  if (Number.isNaN(quantidade_minima) || quantidade_minima < 0) {
+    showToast('Mínimo inválido', 'warning');
+    return;
+  }
+  try {
+    await API.createIngrediente({
+      nome,
+      unidade,
+      quantidade_atual,
+      quantidade_minima
+    });
+    showToast('Material criado', 'success');
+    document.getElementById('novoIngNome').value = '';
+    document.getElementById('novoIngUnidade').value = '';
+    document.getElementById('novoIngAtual').value = '0';
+    document.getElementById('novoIngMin').value = '0';
+    load();
+  } catch (e) {
+    showToast(e.message || 'Erro', 'warning');
+  }
 }
 
 async function load() {

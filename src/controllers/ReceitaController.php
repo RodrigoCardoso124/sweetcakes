@@ -14,18 +14,6 @@ class ReceitaController
         $this->receita = new Receita($db);
     }
 
-    private function requireFuncionario(): bool
-    {
-        if (!Auth::isFuncionario()) {
-            http_response_code(403);
-            echo json_encode(['message' => 'Apenas funcionários podem aceder a receitas.']);
-
-            return false;
-        }
-
-        return true;
-    }
-
     private function requireElevated(): bool
     {
         if (!Auth::isElevatedAdmin($this->db)) {
@@ -40,7 +28,7 @@ class ReceitaController
 
     public function index()
     {
-        if (!$this->requireFuncionario()) {
+        if (!$this->requireElevated()) {
             return;
         }
         $rows = $this->receita->listAll();
@@ -52,7 +40,7 @@ class ReceitaController
 
     public function show($id)
     {
-        if (!$this->requireFuncionario()) {
+        if (!$this->requireElevated()) {
             return;
         }
         $cid = (int) $id;
