@@ -24,7 +24,7 @@
                     <span class="icon">👥</span>
                     <span>Clientes</span>
                 </a>
-                <a href="produtos.html" class="nav-item" data-admin-only="true">
+                <a href="produtos.html" class="nav-item">
                     <span class="icon">🍰</span>
                     <span>Produtos</span>
                 </a>
@@ -73,19 +73,18 @@
 
             <div id="alertBanner" class="alert-banner" style="display:none;"></div>
 
-            <section class="admin-section" id="secProdutosManual" style="display:none;">
-                <h3 class="section-title">Stock de produtos (ajuste manual)</h3>
-                <p class="muted" style="margin-bottom:12px;">Reservado a administradores — registo pontual de unidades sem receita.</p>
+            <section class="admin-section" id="secProdutosStock">
+                <h3 class="section-title">Stock de produtos</h3>
+                <p class="muted" id="producaoStockNoteEmp" style="margin-bottom:12px;">
+                    Consulta para te orientares. O registo manual de unidades (últimas colunas) só está disponível para administradores.
+                </p>
+                <p class="muted" id="producaoStockNoteAdmin" style="margin-bottom:12px;display:none;">
+                    Registo pontual de unidades extra (sem receita) nas últimas colunas; os funcionários vêem apenas a consulta.
+                </p>
                 <div class="table-wrap">
                     <table class="orders-table" id="tblProdutos">
                         <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>Stock</th>
-                                <th>Mín.</th>
-                                <th>+ Unidades</th>
-                                <th></th>
-                            </tr>
+                            <tr id="tblProdutosHead"></tr>
                         </thead>
                         <tbody></tbody>
                     </table>

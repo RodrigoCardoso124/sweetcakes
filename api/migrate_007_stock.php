@@ -71,6 +71,10 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
     );
 
+    if (!columnExists($db, 'pedidos_ingrediente', 'email_fornecedor')) {
+        $db->exec('ALTER TABLE pedidos_ingrediente ADD COLUMN email_fornecedor VARCHAR(255) NULL DEFAULT NULL AFTER notas');
+    }
+
     $db->exec(
         "CREATE TABLE IF NOT EXISTS producao_log (
             log_id INT AUTO_INCREMENT PRIMARY KEY,

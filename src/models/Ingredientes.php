@@ -40,6 +40,11 @@ class Ingredientes {
         return $stmt->execute();
     }
 
+    public function lastInsertId(): int
+    {
+        return (int) $this->conn->lastInsertId();
+    }
+
     public function update() {
         $query = "UPDATE {$this->table}
                   SET nome = :nome,

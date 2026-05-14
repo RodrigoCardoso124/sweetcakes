@@ -26,11 +26,11 @@ class PedidoIngrediente
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function create(int $ingredienteId, float $quantidade, ?string $notas): int
+    public function create(int $ingredienteId, float $quantidade, ?string $notas, ?string $emailFornecedor = null): int
     {
         $stmt = $this->conn->prepare(
-            'INSERT INTO pedidos_ingrediente (ingrediente_id, quantidade, estado, notas)
-             VALUES (:i, :q, \'pendente\', :n)'
+            'INSERT INTO pedidos_ingrediente (ingrediente_id, quantidade, estado, notas, email_fornecedor)
+             VALUES (:i, :q, \'pendente\', :n, :e)'
         );
         $stmt->bindValue(':i', $ingredienteId, PDO::PARAM_INT);
         $stmt->bindValue(':q', $quantidade);
@@ -38,6 +38,11 @@ class PedidoIngrediente
             $stmt->bindValue(':n', null, PDO::PARAM_NULL);
         } else {
             $stmt->bindValue(':n', $notas);
+        }
+        if ($emailFornecedor === null || trim($emailFornecedor) === '') {
+            $stmt->bindValue(':e', null, PDO::PARAM_NULL);
+        } else {
+            $stmt->bindValue(':e', trim($emailFornecedor));
         }
         $stmt->execute();
         return (int) $this->conn->lastInsertId();

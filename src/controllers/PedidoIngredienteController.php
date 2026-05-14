@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../models/PedidoIngrediente.php';
 require_once __DIR__ . '/../models/Ingredientes.php';
 require_once __DIR__ . '/../helpers/Auth.php';
+require_once __DIR__ . '/../helpers/stock_alert_mail.php';
 
 class PedidoIngredienteController
 {
@@ -50,16 +51,56 @@ class PedidoIngredienteController
             return;
         }
         $this->ingrediente->ingrediente_id = $iid;
-        $stmt = $this->ingrediente->getById();
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+        $ingRow = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
+        if (!$ingRow) {
             http_response_code(400);
             echo json_encode(['message' => 'Ingrediente não encontrado']);
             return;
         }
         $notas = isset($data['notas']) ? trim((string) $data['notas']) : null;
-        $pid = $this->pedido->create($iid, $q, $notas);
+        $emailFornecedor = isset($data['email_fornecedor']) ? trim((string) $data['email_fornecedor']) : null;
+        if ($emailFornecedor === '') {
+            $emailFornecedor = null;
+        }
+
+        $nomeMat = (string) ($ingRow['nome'] ?? 'Material');
+        $unidade = (string) ($ingRow['unidade'] ?? '');
+
+        $pid = $this->pedido->create($iid, $q, $notas, $emailFornecedor);
+
+        $emailPedido = [
+            'fornecedor' => ['ok' => false, 'motivo' => 'omitido'],
+            'admins' => ['sent' => 0, 'skipped' => 0, 'last_result' => ['ok' => true, 'motivo' => 'sem_destinatarios']],
+        ];
+
+        if ($emailFornecedor !== null && filter_var($emailFornecedor, FILTER_VALIDATE_EMAIL)) {
+            $emailPedido['fornecedor'] = sc_stock_mail_send_pedido_fornecedor(
+                $emailFornecedor,
+                $pid,
+                $nomeMat,
+                $q,
+                $unidade,
+                $notas
+            );
+        } elseif ($emailFornecedor !== null) {
+            $emailPedido['fornecedor'] = ['ok' => false, 'motivo' => 'email_destino_invalido'];
+        }
+
+        $emailPedido['admins'] = sc_stock_mail_notify_admins_pedido_criado(
+            $this->db,
+            $pid,
+            $nomeMat,
+            $q,
+            $unidade,
+            $emailFornecedor
+        );
+
         http_response_code(201);
-        echo json_encode(['message' => 'Pedido registado', 'pedido_id' => $pid]);
+        echo json_encode([
+            'message' => 'Pedido registado',
+            'pedido_id' => $pid,
+            'email_pedido' => $emailPedido,
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     public function update($id, $data)

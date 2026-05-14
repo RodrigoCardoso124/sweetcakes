@@ -2,6 +2,38 @@
 
 // Produtos management
 let allProdutos = [];
+
+function isElevatedPainel() {
+    return localStorage.getItem('adminIsAdmin') === 'true';
+}
+
+async function refreshRoleFromServer() {
+    if (typeof API === 'undefined' || !API.getSessionInfo) return;
+    try {
+        const s = await API.getSessionInfo();
+        if (s && s.logged_in) {
+            localStorage.setItem('adminIsAdmin', s.is_admin ? 'true' : 'false');
+            localStorage.setItem('adminFuncionarioId', String(s.funcionario_id || ''));
+        }
+    } catch (e) {}
+}
+
+function applyProdutosRoleUi() {
+    const elevated = isElevatedPainel();
+    const addBtn = document.getElementById('addProdutoBtn');
+    if (addBtn) addBtn.style.display = elevated ? '' : 'none';
+    const banner = document.getElementById('produtosReadOnlyBanner');
+    if (banner) {
+        if (elevated) {
+            banner.style.display = 'none';
+            banner.textContent = '';
+        } else {
+            banner.textContent =
+                'Consulta: vês produtos e stock. Só administradores podem criar ou editar.';
+            banner.style.display = 'block';
+        }
+    }
+}
 const ALERGENIOS_OPCOES = ['Glúten', 'Leite', 'Ovo', 'Frutos secos', 'Amendoim', 'Soja' , 'Sulfitos'];
 
 // Placeholder SVG inline para produtos sem imagem
@@ -18,18 +50,23 @@ function getProdutoImageUrl(imagemPath) {
     return `api/image.php?path=${encodeURIComponent(imagemPath.replace(/\\/g, '/'))}`;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initAdminShell === 'function') {
         if (initAdminShell() === false) return;
     } else if (typeof requireAdminPageAuth === 'function' && !requireAdminPageAuth()) return;
 
+    await refreshRoleFromServer();
+    applyProdutosRoleUi();
     loadProdutos();
     setupEventListeners();
 });
 
 function setupEventListeners() {
     document.getElementById('refreshBtn').addEventListener('click', loadProdutos);
-    document.getElementById('addProdutoBtn').addEventListener('click', () => openProdutoModal());
+    document.getElementById('addProdutoBtn').addEventListener('click', () => {
+        if (!isElevatedPainel()) return;
+        openProdutoModal();
+    });
 
     document.getElementById('searchInput').addEventListener('input', filterProdutos);
     document.getElementById('disponibilidadeFilter').addEventListener('change', filterProdutos);
@@ -124,10 +161,14 @@ function renderProdutos(produtos) {
                         <span class="stock-pill ${stockLow ? 'stock-pill--warn' : ''}">Stock: <strong>${stockAtual}</strong></span>
                         <span class="stock-pill stock-pill--muted">Mín: ${stockMin}</span>
                     </div>
-                    <div class="product-actions">
+                    ${
+                        isElevatedPainel()
+                            ? `<div class="product-actions">
                         <button class="btn btn-secondary" onclick="editProduto(${produto.produto_id})">Editar</button>
                         <button class="btn btn-danger" onclick="deleteProduto(${produto.produto_id})">Apagar</button>
-                    </div>
+                    </div>`
+                            : ''
+                    }
                 </div>
             </div>
         `;
@@ -152,6 +193,7 @@ function updateStats(produtos) {
 }
 
 function openProdutoModal(produto = null) {
+    if (!isElevatedPainel()) return;
     const modal = document.getElementById('produtoModal');
     const form = document.getElementById('produtoForm');
     const title = document.getElementById('modalTitle');
@@ -201,7 +243,8 @@ function handleImagePreview(e) {
 
 async function saveProduto(e) {
     e.preventDefault();
-    
+    if (!isElevatedPainel()) return;
+
     const produtoId = document.getElementById('produtoId').value;
     const formData = {
         nome: document.getElementById('produtoNome').value,
@@ -234,6 +277,7 @@ async function saveProduto(e) {
 }
 
 async function deleteProduto(id) {
+    if (!isElevatedPainel()) return;
     if (!confirm('Tem certeza que deseja apagar este produto?')) return;
 
     try {
@@ -246,6 +290,7 @@ async function deleteProduto(id) {
 }
 
 async function editProduto(id) {
+    if (!isElevatedPainel()) return;
     const produto = allProdutos.find(p => p.produto_id == id);
     if (produto) openProdutoModal(produto);
 }

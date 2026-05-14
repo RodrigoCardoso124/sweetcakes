@@ -8,7 +8,7 @@
     <title>Gestão de Produtos - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body data-page-scope="admin">
+<body data-page-scope="employee">
     <div class="admin-container">
         <!-- Sidebar -->
         <aside class="sidebar" id="admin-sidebar">
@@ -25,7 +25,7 @@
                     <span class="icon">👥</span>
                     <span>Clientes</span>
                 </a>
-                <a href="produtos.html" class="nav-item active" data-admin-only="true">
+                <a href="produtos.html" class="nav-item active">
                     <span class="icon">🍰</span>
                     <span>Produtos</span>
                 </a>
@@ -71,6 +71,8 @@
                     <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
                 </div>
             </header>
+
+            <div id="produtosReadOnlyBanner" class="alert-banner" style="display:none;"></div>
 
             <!-- Filters -->
             <div class="filters">

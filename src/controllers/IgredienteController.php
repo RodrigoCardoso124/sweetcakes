@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . "/../models/Ingredientes.php";
+require_once __DIR__ . '/../helpers/stock_alert_mail.php';
 
 class IgredienteController {
     private $db;
@@ -47,6 +48,20 @@ class IgredienteController {
         $this->ingrediente->quantidade_minima = $data['quantidade_minima'];
 
         if ($this->ingrediente->create()) {
+            $this->ingrediente->ingrediente_id = (int) $this->ingrediente->lastInsertId();
+            if ($this->ingrediente->ingrediente_id <= 0) {
+                $this->ingrediente->ingrediente_id = (int) $this->db->lastInsertId();
+            }
+            $row = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
+            if ($row && sc_stock_is_low((float) ($row['quantidade_atual'] ?? 0), (float) ($row['quantidade_minima'] ?? 0))) {
+                sc_stock_mail_notify_admins_ingredient_low(
+                    $this->db,
+                    (string) ($row['nome'] ?? ''),
+                    (float) ($row['quantidade_atual'] ?? 0),
+                    (float) ($row['quantidade_minima'] ?? 0),
+                    (string) ($row['unidade'] ?? '')
+                );
+            }
             http_response_code(201);
             echo json_encode(["message" => "Ingrediente criado com sucesso"]);
         } else {

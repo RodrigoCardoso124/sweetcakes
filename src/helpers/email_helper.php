@@ -296,3 +296,114 @@ function enviar_email_reset_password($to, $nome, $resetUrl)
         return false;
     }
 }
+
+/**
+ * Carrega mail_config.php (+ .local se existir) — mesmo merge que os outros envios.
+ */
+function sc_mail_load_config(): array
+{
+    return require __DIR__ . '/../config/mail_config.php';
+}
+
+/**
+ * Cria PHPMailer SMTP configurado (sem destinatário). Reutilizado por alertas de stock / pedidos.
+ *
+ * @return array{0: ?PHPMailer, 1: string, 2?: string} [mailer ou null, motivo falha, erro_detalhe opcional]
+ */
+function sc_mail_create_phpmailer_base(): array
+{
+    $root = dirname(__DIR__, 2);
+    $mailConfig = sc_mail_load_config();
+
+    if (empty($mailConfig['enabled']) || empty($mailConfig['smtp_password']) || empty($mailConfig['from_email'])) {
+        sc_email_audit_log('smtp_nao_configurado_base', [
+            'enabled' => !empty($mailConfig['enabled']),
+            'tem_password' => !empty($mailConfig['smtp_password']),
+            'tem_from' => !empty($mailConfig['from_email']),
+        ]);
+
+        return [null, 'smtp_nao_configurado'];
+    }
+
+    require_once $root . '/PHPMailer/src/Exception.php';
+    require_once $root . '/PHPMailer/src/PHPMailer.php';
+    require_once $root . '/PHPMailer/src/SMTP.php';
+
+    $mail = new PHPMailer(true);
+    try {
+        $mail->isSMTP();
+        $mail->Host = $mailConfig['smtp_host'];
+        $mail->SMTPAuth = true;
+        $mail->Username = $mailConfig['smtp_username'];
+        $mail->Password = $mailConfig['smtp_password'];
+        $mail->SMTPSecure = ($mailConfig['smtp_secure'] ?? 'tls') === 'ssl'
+            ? PHPMailer::ENCRYPTION_SMTPS
+            : PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port = (int) ($mailConfig['smtp_port'] ?? 587);
+        $mail->CharSet = 'UTF-8';
+        $mail->setFrom($mailConfig['from_email'], $mailConfig['from_name'] ?? 'Sweet Cakes');
+        if (!empty($mailConfig['reply_to'])) {
+            $mail->addReplyTo($mailConfig['reply_to'], $mailConfig['from_name'] ?? 'Sweet Cakes');
+        }
+
+        return [$mail, 'ok'];
+    } catch (\Throwable $e) {
+        $msg = $e->getMessage();
+        sc_email_audit_log('phpmailer_init_erro', ['erro' => $msg]);
+
+        return [null, 'erro_smtp', $msg];
+    }
+}
+
+/**
+ * Envia um email HTML a um destinatário (padrão audit + try/catch como encomendas).
+ *
+ * @return array{ok: bool, motivo: string, erro_detalhe?: string}
+ */
+function sc_mail_send_html_single(string $to, string $subject, string $htmlBody, string $altBody = ''): array
+{
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        sc_email_audit_log('email_destino_invalido_single', ['to' => $to]);
+
+        return ['ok' => false, 'motivo' => 'email_destino_invalido'];
+    }
+
+    $base = sc_mail_create_phpmailer_base();
+    $mail = $base[0];
+    $motivo = $base[1];
+    $det = $base[2] ?? null;
+    if ($mail === null) {
+        $out = ['ok' => false, 'motivo' => $motivo];
+        if (!empty($det)) {
+            $out['erro_detalhe'] = $det;
+        }
+
+        return $out;
+    }
+
+    try {
+        $mail->clearAddresses();
+        $mail->addAddress($to);
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body = $htmlBody;
+        $mail->AltBody = $altBody !== '' ? $altBody : strip_tags($htmlBody);
+        $mail->send();
+
+        sc_email_audit_log('email_single_enviado', ['to' => $to, 'subject' => $subject]);
+
+        return ['ok' => true, 'motivo' => 'enviado'];
+    } catch (\Throwable $e) {
+        $msg = $e->getMessage();
+        error_log('[EMAIL_HELPER] sc_mail_send_html_single: '.$msg);
+        sc_email_audit_log('erro_smtp_single', ['to' => $to, 'erro' => $msg]);
+        $curto = preg_replace('/\s+/', ' ', $msg);
+        if (function_exists('mb_substr')) {
+            $curto = mb_substr($curto, 0, 280, 'UTF-8');
+        } else {
+            $curto = substr($curto, 0, 280);
+        }
+
+        return ['ok' => false, 'motivo' => 'erro_smtp', 'erro_detalhe' => $curto];
+    }
+}

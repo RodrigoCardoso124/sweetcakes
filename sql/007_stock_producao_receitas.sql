@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS pedidos_ingrediente (
   quantidade DECIMAL(12,4) NOT NULL,
   estado ENUM('pendente','recebido','cancelado') NOT NULL DEFAULT 'pendente',
   notas VARCHAR(500) NULL,
+  email_fornecedor VARCHAR(255) NULL,
   criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   atualizado_em TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_pi_ing FOREIGN KEY (ingrediente_id) REFERENCES ingredientes(ingrediente_id) ON DELETE CASCADE,

@@ -17,16 +17,16 @@ async function refreshRoleFromServer() {
 
 function applyProducaoIntroAndSections() {
   const intro = document.getElementById('producaoIntro');
-  const sec = document.getElementById('secProdutosManual');
   const elevated = isElevatedPainel();
   if (intro) {
     intro.textContent = elevated
       ? 'Executa receitas em lote (desconta matérias e aumenta stock do produto) ou, se precisares, regista manualmente unidades extra (só admin).'
-      : 'Executa uma receita em lote: o sistema desconta as matérias-primas e aumenta o stock do produto automaticamente. O stock manual só pode ser alterado por um administrador.';
+      : 'Executa uma receita em lote: o sistema desconta as matérias-primas e aumenta o stock do produto automaticamente. A tabela de stock em cima é só para consulta.';
   }
-  if (sec) {
-    sec.style.display = elevated ? '' : 'none';
-  }
+  const noteEmp = document.getElementById('producaoStockNoteEmp');
+  const noteAdm = document.getElementById('producaoStockNoteAdmin');
+  if (noteEmp) noteEmp.style.display = elevated ? 'none' : 'block';
+  if (noteAdm) noteAdm.style.display = elevated ? 'block' : 'none';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -85,18 +85,20 @@ function renderAlerts(d) {
 
 function renderProdutos(list) {
   const tb = document.querySelector('#tblProdutos tbody');
-  if (!tb) return;
-  if (!isElevatedPainel()) {
-    tb.innerHTML = '';
-    return;
-  }
+  const headRow = document.getElementById('tblProdutosHead');
+  if (!tb || !headRow) return;
+  const elevated = isElevatedPainel();
+  headRow.innerHTML = elevated
+    ? '<th>Produto</th><th>Stock</th><th>Mín.</th><th>+ Unidades</th><th></th>'
+    : '<th>Produto</th><th>Stock actual</th><th>Stock mínimo</th>';
+
   tb.innerHTML = list
     .map((p) => {
       const id = p.produto_id;
       const low =
         parseInt(p.stock_minimo, 10) > 0 &&
         parseInt(p.stock_atual, 10) <= parseInt(p.stock_minimo, 10);
-      return (
+      const base =
         '<tr' +
         (low ? ' class="row-warn"' : '') +
         '><td>' +
@@ -105,7 +107,13 @@ function renderProdutos(list) {
         (p.stock_atual ?? 0) +
         '</td><td>' +
         (p.stock_minimo ?? 0) +
-        '</td><td><input type="number" min="1" step="1" value="1" id="add-' +
+        '</td>';
+      if (!elevated) {
+        return base + '</tr>';
+      }
+      return (
+        base +
+        '<td><input type="number" min="1" step="1" value="1" id="add-' +
         id +
         '" class="qty-input"></td><td><button type="button" class="btn btn-primary btn-sm" data-prod="' +
         id +
@@ -113,6 +121,8 @@ function renderProdutos(list) {
       );
     })
     .join('');
+
+  if (!elevated) return;
 
   tb.querySelectorAll('button[data-prod]').forEach((btn) => {
     btn.addEventListener('click', async () => {
