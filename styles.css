@@ -1186,6 +1186,23 @@ textarea:focus {
     font-size: 14px;
 }
 
+.pedidos-pendentes-bar a {
+    color: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.pendente-est {
+    color: var(--text-warn);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.rec-lucro-wrap {
+    border-top: 1px solid var(--border-color);
+    padding-top: 4px;
+}
+
 .cards-responsive {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1571,5 +1588,46 @@ textarea:focus {
     .stats-grid--pipeline {
         grid-template-columns: 1fr;
     }
+}
+
+/* Lucro — Estatísticas */
+.lucro-total-card {
+    margin: 24px 0 8px;
+    padding: 28px 24px;
+    text-align: center;
+    border-radius: var(--radius-lg);
+    border: 2px solid var(--primary-color);
+    background: linear-gradient(180deg, rgba(212, 165, 116, 0.14) 0%, var(--card-bg) 100%);
+    box-shadow: var(--shadow-lg);
+}
+
+.lucro-total-label {
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+}
+
+.lucro-total-valor {
+    margin: 0;
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-weight: 800;
+    color: var(--success);
+    letter-spacing: -0.02em;
+}
+
+.lucro-total-valor--neg {
+    color: var(--danger);
+}
+
+.lucro-total-formula {
+    margin: 12px 0 0;
+    font-size: 15px;
+}
+
+#sec-lucro .section-title {
+    margin-top: 8px;
 }
 

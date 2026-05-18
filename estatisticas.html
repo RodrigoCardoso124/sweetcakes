@@ -37,9 +37,9 @@
                     <span class="icon">👔</span>
                     <span>Funcionários</span>
                 </a>
-                <a href="estatisticas.html" class="nav-item">
+                <a href="estatisticas.html" class="nav-item active">
                     <span class="icon">📊</span>
-                    <span>Estatísticas</span>
+                    <span>Estatísticas & Lucro</span>
                 </a>
                 <a href="producao.html" class="nav-item">
                     <span class="icon">🏭</span>
@@ -101,6 +101,50 @@
                         <p>Total Produtos</p>
                     </div>
                 </div>
+            </div>
+
+            <div class="detail-card" id="sec-lucro" data-admin-only="true">
+                <h3>Lucro e despesas</h3>
+                <p class="page-intro" style="margin-bottom:14px;">
+                    <strong>Lucro total = Ganhos − Despesas.</strong> Compras ao fornecedor só entram quando marcas o pedido como
+                    <em>Recebido</em> com o preço pago em <a href="materiais-stock.html">Materiais</a>.
+                </p>
+                <div id="lucroMigrateBanner" class="alert-banner" style="display:none;margin-bottom:14px;"></div>
+                <div id="lucroPedidosPendentes" class="alert-banner" style="display:none;margin-bottom:14px;"></div>
+                <div class="filters filters-toolbar" style="margin-bottom:18px;">
+                    <label class="muted">De <input type="date" id="lucroDe" class="filter-select"></label>
+                    <label class="muted">Até <input type="date" id="lucroAte" class="filter-select"></label>
+                    <button type="button" id="lucroAplicarBtn" class="btn btn-primary">Calcular</button>
+                </div>
+                <div class="stats-grid stats-grid--pipeline">
+                    <motion></motion>
+                    <div class="stat-card stat-card--compact"><motion></motion><div class="stat-icon">📈</div><div class="stat-info"><h3 id="lucroGanhos">—</h3><p>Ganhos</p></div></div>
+                    <div class="stat-card stat-card--compact"><div class="stat-icon">🛒</motion></motion></div><div class="stat-info"><h3 id="lucroComprasForn">—</h3><p>Compras fornecedor</p></div></div>
+                    <div class="stat-card stat-card--compact"><div class="stat-icon">📋</div><motion></motion><motion></motion><div class="stat-info"><h3 id="lucroOutrasDesp">—</h3><p>Outras despesas</p></div></div>
+                    <div class="stat-card stat-card--compact"><div class="stat-icon">📉</div><div class="stat-info"><h3 id="lucroDespesasTotal">—</h3><p>Despesas totais</p></div></div>
+                </div>
+                <div class="lucro-total-card">
+                    <p class="lucro-total-label">Lucro total estimado</p>
+                    <p class="lucro-total-valor" id="lucroTotalValor">—</p>
+                    <p class="muted lucro-total-formula" id="lucroTotalFormula">Ganhos − Despesas totais</p>
+                </div>
+                <p id="lucroNotas" class="muted" style="margin:16px 0;"></p>
+                <h4 class="section-title">Outras despesas</h4>
+                <div class="info-card" style="margin-bottom:16px;">
+                    <div class="form-row-2">
+                        <div class="form-group"><label for="lucroDespTipo">Tipo</label>
+                            <select id="lucroDespTipo" class="form-select"><option value="embalagem">Embalagem</option><option value="servicos">Serviços</option><option value="equipamento">Equipamento</option><option value="outro">Outro</option></select>
+                        </div>
+                        <div class="form-group"><label for="lucroDespData">Data</label><input type="date" id="lucroDespData" class="form-select"></div>
+                    </div>
+                    <div class="form-group"><label for="lucroDespDesc">Descrição</label><input type="text" id="lucroDespDesc" maxlength="255"></div>
+                    <div class="form-row-2">
+                        <div class="form-group"><label for="lucroDespValor">Valor (€)</label><input type="number" id="lucroDespValor" min="0.01" step="0.01"></div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;"><button type="button" id="lucroDespAddBtn" class="btn btn-primary">Adicionar</button></div>
+                    </div>
+                </div>
+                <h4 class="section-title">Despesas no período</h4>
+                <div class="table-wrap"><table class="orders-table" id="tblLucroMov"><thead><tr><th>Data</th><th>Origem</th><th>Descrição</th><th>Valor</th></tr></thead><tbody></tbody></table></div>
             </div>
 
             <!-- Encomendas Stats -->
@@ -213,7 +257,7 @@
 
     <script src="api.js"></script>
     <script src="admin-common.js"></script>
-    <script src="estatisticas.js?v=20260323"></script>
+    <script src="estatisticas.js?v=20260518"></script>
 </body>
 </html>
 

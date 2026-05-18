@@ -1,6 +1,7 @@
 /* global API, initAdminShell, showToast */
 
 let ingredientes = [];
+let pedidos = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
@@ -14,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('recClose').addEventListener('click', closeRec);
   document.getElementById('recCancel').addEventListener('click', closeRec);
   document.getElementById('recSave').addEventListener('click', saveRec);
+  document.getElementById('recPrecoUnit').addEventListener('input', updateRecEstimativa);
+  document.getElementById('recValorTotal').addEventListener('input', updateRecEstimativa);
   window.addEventListener('click', (e) => {
     if (e.target.id === 'pedModal') closePed();
     if (e.target.id === 'recModal') closeRec();
@@ -27,6 +30,95 @@ function closePed() {
 
 function closeRec() {
   document.getElementById('recModal').classList.remove('active');
+  resetRecModal();
+}
+
+function resetRecModal() {
+  document.querySelector('#recModal .modal-actions').style.display = '';
+  document.getElementById('recLucroWrap').style.display = 'none';
+  document.getElementById('recEstimativa').textContent = '';
+}
+
+function fmtEuro(n) {
+  if (n == null || Number.isNaN(n)) return '—';
+  return '€' + Number(n).toFixed(2);
+}
+
+function precoIngrediente(ingredienteId) {
+  const ing = ingredientes.find(
+    (x) => String(x.ingrediente_id) === String(ingredienteId)
+  );
+  const p = ing ? parseFloat(ing.preco_unitario) : 0;
+  return Number.isNaN(p) || p < 0 ? 0 : p;
+}
+
+/** Soma qty dos pedidos pendentes × preço de catálogo actual (informativo). */
+function pendenteEstimadoIngrediente(ingredienteId) {
+  let total = 0;
+  pedidos.forEach((p) => {
+    if (p.estado !== 'pendente') return;
+    if (String(p.ingrediente_id) !== String(ingredienteId)) return;
+    const q = parseFloat(p.quantidade);
+    if (Number.isNaN(q) || q <= 0) return;
+    total += q * precoIngrediente(ingredienteId);
+  });
+  return total;
+}
+
+function totalPendenteEstimado() {
+  return pedidos
+    .filter((p) => p.estado === 'pendente')
+    .reduce((acc, p) => acc + (estimativaPedido(p) || 0), 0);
+}
+
+function estimativaPedido(p) {
+  if (p.estado !== 'pendente') return null;
+  const q = parseFloat(p.quantidade);
+  if (Number.isNaN(q) || q <= 0) return null;
+  return q * precoIngrediente(p.ingrediente_id);
+}
+
+function renderPedidosPendentesBar() {
+  const bar = document.getElementById('pedidosPendentesBar');
+  if (!bar) return;
+  const n = pedidos.filter((p) => p.estado === 'pendente').length;
+  const total = totalPendenteEstimado();
+  if (!n) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+    return;
+  }
+  bar.style.display = 'block';
+  bar.innerHTML =
+    '<strong>' +
+    n +
+    ' pedido(s) pendente(s)</strong> — valor estimado (preço de catálogo actual): <strong>' +
+    fmtEuro(total) +
+    '</strong>. Só entra nas despesas ao marcar <em>Recebido</em>. ' +
+    '<a href="estatisticas.html#sec-lucro">Ver lucro em Estatísticas</a>';
+}
+
+let recPedidoActual = null;
+
+function updateRecEstimativa() {
+  const el = document.getElementById('recEstimativa');
+  if (!el || !recPedidoActual) return;
+  const q = parseFloat(recPedidoActual.quantidade);
+  const puc = parseFloat(document.getElementById('recPrecoUnit').value);
+  const vtRaw = document.getElementById('recValorTotal').value;
+  const cat = precoIngrediente(recPedidoActual.ingrediente_id);
+  let parts = [];
+  if (!Number.isNaN(q) && q > 0 && cat > 0) {
+    parts.push('Catálogo actual: ' + fmtEuro(q * cat));
+  }
+  if (!Number.isNaN(puc) && puc >= 0 && !Number.isNaN(q) && q > 0) {
+    parts.push('Com preço indicado: ' + fmtEuro(q * puc));
+  }
+  if (vtRaw !== '') {
+    const vt = parseFloat(vtRaw);
+    if (!Number.isNaN(vt) && vt > 0) parts.push('Total indicado: ' + fmtEuro(vt));
+  }
+  el.textContent = parts.length ? parts.join(' · ') : '';
 }
 
 async function criarIngrediente() {
@@ -78,8 +170,10 @@ async function load() {
       API.getPedidosIngrediente()
     ]);
     ingredientes = Array.isArray(ing) ? ing : [];
+    pedidos = Array.isArray(ped) ? ped : [];
     renderIng(ingredientes);
-    renderPed(Array.isArray(ped) ? ped : []);
+    renderPed(pedidos);
+    renderPedidosPendentesBar();
     const low = ingredientes.filter(
       (i) =>
         parseFloat(i.quantidade_minima) > 0 &&
@@ -107,6 +201,13 @@ function renderIng(list) {
       const low =
         parseFloat(i.quantidade_minima) > 0 &&
         parseFloat(i.quantidade_atual) <= parseFloat(i.quantidade_minima);
+      const pend = pendenteEstimadoIngrediente(i.ingrediente_id);
+      const pendCell =
+        pend > 0
+          ? '<span class="pendente-est" title="Pedidos pendentes × preço actual">' +
+            fmtEuro(pend) +
+            '</span>'
+          : '<span class="muted">—</span>';
       return (
         '<tr' +
         (low ? ' class="row-warn"' : '') +
@@ -126,7 +227,9 @@ function renderIng(list) {
         i.ingrediente_id +
         '" value="' +
         (i.preco_unitario != null ? i.preco_unitario : 0) +
-        '"></td><td><button type="button" class="btn btn-primary btn-sm" data-save="' +
+        '"></td><td>' +
+        pendCell +
+        '</td><td><button type="button" class="btn btn-primary btn-sm" data-save="' +
         i.ingrediente_id +
         '">Guardar</button></td><td><button type="button" class="btn btn-secondary btn-sm" data-ped="' +
         i.ingrediente_id +
@@ -210,6 +313,17 @@ function renderPed(list) {
   const tb = document.querySelector('#tblPed tbody');
   tb.innerHTML = list
     .map((p) => {
+      const est = estimativaPedido(p);
+      const estCell =
+        est != null && est > 0
+          ? '<span class="pendente-est" title="Qtd × preço de catálogo">' + fmtEuro(est) + '</span>'
+          : '—';
+      const totalCell =
+        p.estado === 'recebido' && p.valor_total != null
+          ? fmtEuro(p.valor_total)
+          : p.estado === 'recebido' && p.preco_unitario_compra != null
+            ? fmtEuro(parseFloat(p.quantidade) * parseFloat(p.preco_unitario_compra))
+            : '—';
       return (
         '<tr><td>' +
         p.pedido_id +
@@ -222,7 +336,9 @@ function renderPed(list) {
         '</td><td>' +
         escapeHtml(p.estado) +
         '</td><td>' +
-        (p.valor_total != null ? '€' + Number(p.valor_total).toFixed(2) : '—') +
+        estCell +
+        '</td><td>' +
+        totalCell +
         '</td><td>' +
         escapeHtml((p.criado_em || '').substring(0, 16)) +
         '</td><td>' +
@@ -242,14 +358,23 @@ function renderPed(list) {
     b.addEventListener('click', () => {
       const pid = b.getAttribute('data-rec');
       const ped = list.find((x) => String(x.pedido_id) === String(pid));
+      recPedidoActual = ped || null;
+      resetRecModal();
       document.getElementById('recPedId').value = pid;
       document.getElementById('recPedInfo').textContent = ped
         ? ped.ingrediente_nome + ' — ' + ped.quantidade + ' ' + (ped.unidade || '')
         : '';
-      document.getElementById('recPrecoUnit').value =
-        ped && ped.preco_unitario_compra != null ? ped.preco_unitario_compra : '';
+      const cat = ped ? precoIngrediente(ped.ingrediente_id) : 0;
+      const sugerido =
+        ped && ped.preco_unitario_compra != null
+          ? ped.preco_unitario_compra
+          : cat > 0
+            ? cat
+            : '';
+      document.getElementById('recPrecoUnit').value = sugerido;
       document.getElementById('recValorTotal').value = '';
       document.getElementById('recFatura').value = '';
+      updateRecEstimativa();
       document.getElementById('recModal').classList.add('active');
     })
   );
@@ -283,8 +408,9 @@ async function saveRec() {
   try {
     await API.updatePedidoIngrediente(id, payload);
     showToast('Pedido recebido — stock e preço actualizados', 'success');
-    closeRec();
-    load();
+    document.querySelector('#recModal .modal-actions').style.display = 'none';
+    document.getElementById('recLucroWrap').style.display = 'block';
+    await load();
   } catch (e) {
     showToast(e.message, 'warning');
   }

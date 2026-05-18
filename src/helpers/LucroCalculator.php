@@ -415,62 +415,118 @@ class LucroCalculator
 
 
         $lucroBruto = $margem['receita_linhas'] - $margem['custo_linhas'];
+        $despesasTotal = $comprasMateriais + $despesasGerais;
+        $lucroTotal = $receitaTotal - $despesasTotal;
 
-        $lucroLiquido = $receitaTotal - $comprasMateriais - $despesasGerais;
+        $pedidosPendentes = 0;
+        if (self::tableExists($db, 'pedidos_ingrediente')) {
+            $stmtPen = $db->query(
+                "SELECT COUNT(*) AS c FROM pedidos_ingrediente WHERE estado = 'pendente'"
+            );
+            $pedidosPendentes = (int) ($stmtPen->fetch(PDO::FETCH_ASSOC)['c'] ?? 0);
+        }
 
-
+        $movimentos = self::listarMovimentosDespesa($db, $de, $ate);
 
         return [
-
             'periodo' => ['de' => $de, 'ate' => $ate],
-
-            'receita' => [
-
+            'ganhos' => [
                 'encomendas_entregues' => round($receitaEncomendas, 2),
-
                 'vendas_balcao' => round($receitaVendas, 2),
-
                 'total' => round($receitaTotal, 2),
-
             ],
-
+            'despesas' => [
+                'compras_fornecedor' => round($comprasMateriais, 2),
+                'outras' => round($despesasGerais, 2),
+                'total' => round($despesasTotal, 2),
+            ],
+            'lucro_total' => round($lucroTotal, 2),
+            'receita' => [
+                'encomendas_entregues' => round($receitaEncomendas, 2),
+                'vendas_balcao' => round($receitaVendas, 2),
+                'total' => round($receitaTotal, 2),
+            ],
             'custos' => [
-
                 'compras_materiais_recebidas' => round($comprasMateriais, 2),
-
                 'despesas_gerais' => round($despesasGerais, 2),
-
                 'custo_estimado_vendido' => round($margem['custo_linhas'], 2),
-
             ],
-
             'lucro' => [
-
+                'total' => round($lucroTotal, 2),
                 'bruto_margem_vendido' => round($lucroBruto, 2),
-
-                'liquido_caixa' => round($lucroLiquido, 2),
-
+                'liquido_caixa' => round($lucroTotal, 2),
             ],
-
+            'pedidos_fornecedor' => [
+                'pendentes' => $pedidosPendentes,
+                'ajuda' => 'Os pedidos ao fornecedor só entram nas despesas quando marcas «Recebido» e indicas o preço pago (em Materiais).',
+            ],
+            'movimentos_despesa' => $movimentos,
             'margem_vendido' => $margem,
-
             'notas' => [
-
                 'precos_sem_iva' => true,
-
                 'encomendas_contam_estado' => $estados,
-
                 'linhas_sem_custo' => $margem['linhas_sem_custo'],
-
                 'linhas_sem_preco' => $margem['linhas_sem_preco'],
-
+                'formula_lucro' => 'Lucro total = Ganhos (vendas) − Despesas (compras recebidas + outras despesas)',
             ],
-
         ];
 
     }
 
-
+    /**
+     * Compras recebidas (fornecedor) + despesas manuais no período.
+     */
+    public static function listarMovimentosDespesa(PDO $db, string $de, string $ate): array
+    {
+        $out = [];
+        if (self::tableExists($db, 'pedidos_ingrediente') && self::columnExists($db, 'pedidos_ingrediente', 'valor_total')) {
+            $sql = "SELECT p.pedido_id AS id, p.data_recebido AS data_ref, p.valor_total AS valor,
+                           i.nome AS descricao, p.num_fatura AS extra
+                    FROM pedidos_ingrediente p
+                    INNER JOIN ingredientes i ON i.ingrediente_id = p.ingrediente_id
+                    WHERE p.estado = 'recebido' AND p.valor_total IS NOT NULL AND p.valor_total > 0";
+            $params = [];
+            if (self::columnExists($db, 'pedidos_ingrediente', 'data_recebido')) {
+                $sql .= ' AND p.data_recebido BETWEEN ? AND ?';
+                $params = [$de, $ate];
+            } elseif (self::columnExists($db, 'pedidos_ingrediente', 'atualizado_em')) {
+                $sql .= ' AND DATE(p.atualizado_em) BETWEEN ? AND ?';
+                $params = [$de, $ate];
+            }
+            $sql .= ' ORDER BY data_ref DESC, p.pedido_id DESC LIMIT 80';
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $out[] = [
+                    'tipo' => 'compra_fornecedor',
+                    'data' => $r['data_ref'] ?? '',
+                    'descricao' => 'Pedido #' . $r['id'] . ' — ' . ($r['descricao'] ?? 'Material'),
+                    'valor' => round((float) $r['valor'], 2),
+                    'detalhe' => !empty($r['extra']) ? 'Fatura: ' . $r['extra'] : '',
+                ];
+            }
+        }
+        if (self::tableExists($db, 'despesas')) {
+            $stmt = $db->prepare(
+                'SELECT despesa_id, data_despesa, descricao, valor, tipo FROM despesas
+                 WHERE data_despesa BETWEEN ? AND ? ORDER BY data_despesa DESC LIMIT 80'
+            );
+            $stmt->execute([$de, $ate]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $out[] = [
+                    'tipo' => (string) ($r['tipo'] ?? 'outro'),
+                    'data' => $r['data_despesa'],
+                    'descricao' => $r['descricao'],
+                    'valor' => round((float) $r['valor'], 2),
+                    'detalhe' => 'Despesa #' . $r['despesa_id'],
+                ];
+            }
+        }
+        usort($out, static function ($a, $b) {
+            return strcmp((string) $b['data'], (string) $a['data']);
+        });
+        return array_slice($out, 0, 100);
+    }
 
     private static function tableExists(PDO $db, string $table): bool
 

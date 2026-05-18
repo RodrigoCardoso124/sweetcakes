@@ -21,8 +21,7 @@
                 <a href="produtos.html" class="nav-item"><span class="icon">🍰</span><span>Produtos</span></a>
                 <a href="promocoes.html" class="nav-item" data-admin-only="true"><span class="icon">🎁</span><span>Promoções</span></a>
                 <a href="funcionarios.html" class="nav-item" data-admin-only="true"><span class="icon">👔</span><span>Funcionários</span></a>
-                <a href="estatisticas.html" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas</span></a>
-                <a href="lucro.html" class="nav-item" data-admin-only="true"><span class="icon">💶</span><span>Lucro</span></a>
+                <a href="estatisticas.html#sec-lucro" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas & Lucro</span></a>
                 <a href="producao.html" class="nav-item"><span class="icon">🏭</span><span>Produção</span></a>
                 <a href="receitas.html" class="nav-item" data-admin-only="true"><span class="icon">📋</span><span>Receitas</span></a>
                 <a href="materiais-stock.html" class="nav-item active" data-admin-only="true"><span class="icon">🧂</span><span>Materiais</span></a>
@@ -39,6 +38,7 @@
                     <h2>Matérias-primas & pedidos</h2>
                 </div>
                 <div class="header-actions">
+                    <a href="estatisticas.html#sec-lucro" class="btn btn-secondary">💶 Ver lucro</a>
                     <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
                 </div>
             </header>
@@ -89,6 +89,7 @@
                                 <th>Mín.</th>
                                 <th>Unid.</th>
                                 <th>€/unid.</th>
+                                <th title="Soma dos pedidos pendentes × preço actual (estimativa)">Pendente € est.</th>
                                 <th>Actualizar</th>
                                 <th>Pedido</th>
                             </tr>
@@ -100,6 +101,7 @@
 
             <section class="admin-section">
                 <h3 class="section-title">Pedidos (fornecedor)</h3>
+                <div id="pedidosPendentesBar" class="alert-banner pedidos-pendentes-bar" style="display:none;"></div>
                 <div class="table-wrap">
                     <table class="orders-table" id="tblPed">
                         <thead>
@@ -109,6 +111,7 @@
                                 <th>Qtd</th>
                                 <th>Email forn.</th>
                                 <th>Estado</th>
+                                <th>Est. €</th>
                                 <th>Total €</th>
                                 <th>Data</th>
                                 <th></th>
@@ -139,9 +142,14 @@
                 <label for="recFatura">N.º fatura (opcional)</label>
                 <input type="text" id="recFatura" maxlength="80">
             </div>
+            <p id="recEstimativa" class="muted" style="margin:0 0 12px;font-size:13px;"></p>
             <div class="modal-actions">
                 <button type="button" class="btn btn-primary" id="recSave">Confirmar receção</button>
                 <button type="button" class="btn btn-secondary" id="recCancel">Cancelar</button>
+            </div>
+            <div id="recLucroWrap" class="rec-lucro-wrap" style="display:none;">
+                <p class="muted" style="margin:12px 0 8px;">Compra registada nas despesas. Actualiza o lucro em Estatísticas.</p>
+                <a href="estatisticas.html#sec-lucro" class="btn btn-primary btn-block">Ver lucro em Estatísticas</a>
             </div>
         </div>
     </div>

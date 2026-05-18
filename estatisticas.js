@@ -6,13 +6,153 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadEstatisticas();
     setupEventListeners();
-    
+    setupLucro();
+    if (location.hash === '#sec-lucro') {
+        setTimeout(function () {
+            var el = document.getElementById('sec-lucro');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 400);
+    }
     setInterval(loadEstatisticas, 60000);
 });
 
 function setupEventListeners() {
-    // Refresh
-    document.getElementById('refreshBtn').addEventListener('click', loadEstatisticas);
+    document.getElementById('refreshBtn').addEventListener('click', function () {
+        loadEstatisticas();
+        if (typeof loadLucro === 'function') loadLucro();
+    });
+}
+
+function fmtEuro(n) {
+    if (n == null || Number.isNaN(n)) return '—';
+    return '€' + Number(n).toFixed(2);
+}
+
+function setupLucro() {
+    var sec = document.getElementById('sec-lucro');
+    if (!sec || typeof API === 'undefined' || !API.getFinancasResumo) return;
+    var ate = new Date();
+    var de = new Date(ate.getFullYear(), ate.getMonth(), 1);
+    var deEl = document.getElementById('lucroDe');
+    var ateEl = document.getElementById('lucroAte');
+    if (deEl) deEl.value = de.toISOString().slice(0, 10);
+    if (ateEl) ateEl.value = ate.toISOString().slice(0, 10);
+    if (document.getElementById('lucroDespData')) {
+        document.getElementById('lucroDespData').value = ate.toISOString().slice(0, 10);
+    }
+    document.getElementById('lucroAplicarBtn').addEventListener('click', loadLucro);
+    document.getElementById('lucroDespAddBtn').addEventListener('click', addLucroDespesa);
+    loadLucro();
+}
+
+async function loadLucro() {
+    var de = document.getElementById('lucroDe').value;
+    var ate = document.getElementById('lucroAte').value;
+    var mig = document.getElementById('lucroMigrateBanner');
+    var pend = document.getElementById('lucroPedidosPendentes');
+    try {
+        var r = await API.getFinancasResumo(de, ate);
+        mig.style.display = 'none';
+        var g = r.ganhos || r.receita || {};
+        var d = r.despesas || {};
+        document.getElementById('lucroGanhos').textContent = fmtEuro(g.total);
+        document.getElementById('lucroComprasForn').textContent = fmtEuro(
+            d.compras_fornecedor != null ? d.compras_fornecedor : d.compras_materiais_recebidas
+        );
+        document.getElementById('lucroOutrasDesp').textContent = fmtEuro(d.outras != null ? d.outras : d.despesas_gerais);
+        document.getElementById('lucroDespesasTotal').textContent = fmtEuro(d.total);
+        var lt = r.lucro_total != null ? r.lucro_total : (r.lucro && r.lucro.total);
+        document.getElementById('lucroTotalValor').textContent = fmtEuro(lt);
+        var elTotal = document.getElementById('lucroTotalValor');
+        elTotal.classList.toggle('lucro-total-valor--neg', Number(lt) < 0);
+        document.getElementById('lucroTotalFormula').textContent =
+            '€' + Number(g.total || 0).toFixed(2) + ' − €' + Number(d.total || 0).toFixed(2) + ' = ' + fmtEuro(lt);
+        var pf = r.pedidos_fornecedor || {};
+        if (pf.pendentes > 0) {
+            pend.textContent =
+                pf.pendentes +
+                ' pedido(s) ao fornecedor ainda não recebidos — ainda não entram nas despesas. Quando chegarem, marca «Recebido» em Materiais e indica o preço.';
+            pend.style.display = 'block';
+        } else {
+            pend.style.display = 'none';
+        }
+        var notas = [];
+        if (r.notas && r.notas.formula_lucro) notas.push(r.notas.formula_lucro);
+        if (r.notas && r.notas.linhas_sem_custo > 0) {
+            notas.push(r.notas.linhas_sem_custo + ' venda(s) sem custo estimado (receita/preço material em falta).');
+        }
+        document.getElementById('lucroNotas').textContent = notas.join(' ');
+        renderLucroMovimentos(r.movimentos_despesa || []);
+    } catch (e) {
+        var msg = e.message || String(e);
+        if (mig && (msg.indexOf('500') !== -1 || msg.indexOf('financas') !== -1)) {
+            mig.textContent = 'Execute a migração: /api/migrate_008_financas.php';
+            mig.style.display = 'block';
+        }
+        if (typeof showToast === 'function') showToast('Lucro: ' + msg, 'warning');
+    }
+}
+
+function renderLucroMovimentos(list) {
+    var tb = document.querySelector('#tblLucroMov tbody');
+    if (!tb) return;
+    if (!list.length) {
+        tb.innerHTML =
+            '<tr><td colspan="4" class="table-empty-msg">Sem despesas no período. Compras aparecem ao marcar pedidos como recebidos em Materiais.</td></tr>';
+        return;
+    }
+    var labels = {
+        compra_fornecedor: 'Fornecedor (recebido)',
+        material: 'Material',
+        embalagem: 'Embalagem',
+        equipamento: 'Equipamento',
+        servicos: 'Serviços',
+        outro: 'Outro'
+    };
+    tb.innerHTML = list
+        .map(function (m) {
+            return (
+                '<tr><td>' +
+                escapeHtmlLucro(m.data) +
+                '</td><td>' +
+                escapeHtmlLucro(labels[m.tipo] || m.tipo) +
+                '</td><td>' +
+                escapeHtmlLucro(m.descricao) +
+                (m.detalhe ? ' <span class="muted">' + escapeHtmlLucro(m.detalhe) + '</span>' : '') +
+                '</td><td>' +
+                fmtEuro(m.valor) +
+                '</td></tr>'
+            );
+        })
+        .join('');
+}
+
+async function addLucroDespesa() {
+    var payload = {
+        tipo: document.getElementById('lucroDespTipo').value,
+        descricao: document.getElementById('lucroDespDesc').value.trim(),
+        valor: parseFloat(document.getElementById('lucroDespValor').value),
+        data_despesa: document.getElementById('lucroDespData').value
+    };
+    if (!payload.descricao || !(payload.valor > 0)) {
+        if (typeof showToast === 'function') showToast('Descrição e valor obrigatórios', 'warning');
+        return;
+    }
+    try {
+        await API.createDespesa(payload);
+        if (typeof showToast === 'function') showToast('Despesa registada', 'success');
+        document.getElementById('lucroDespDesc').value = '';
+        document.getElementById('lucroDespValor').value = '';
+        loadLucro();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(e.message, 'warning');
+    }
+}
+
+function escapeHtmlLucro(t) {
+    var d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
 }
 
 function ensureArray(value) {
