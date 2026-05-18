@@ -4,6 +4,7 @@ require_once __DIR__ . '/../models/PedidoIngrediente.php';
 require_once __DIR__ . '/../models/Ingredientes.php';
 require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/stock_alert_mail.php';
+require_once __DIR__ . '/../helpers/LucroCalculator.php';
 
 class PedidoIngredienteController
 {
@@ -126,10 +127,31 @@ class PedidoIngredienteController
             $this->db->beginTransaction();
 
             if ($estado === 'recebido' && $anterior === 'pendente') {
-                $this->ingrediente->adjustQuantidade((int) $row['ingrediente_id'], (float) $row['quantidade']);
-            }
+                $iid = (int) $row['ingrediente_id'];
+                $qtd = (float) $row['quantidade'];
+                $this->ingrediente->adjustQuantidade($iid, $qtd);
 
-            $this->pedido->setEstado((int) $id, $estado);
+                $puc = isset($data['preco_unitario_compra']) ? (float) $data['preco_unitario_compra'] : null;
+                $vt = isset($data['valor_total']) ? (float) $data['valor_total'] : null;
+                if ($puc === null && $vt !== null && $vt > 0 && $qtd > 0) {
+                    $puc = $vt / $qtd;
+                }
+                if ($puc === null || $puc < 0) {
+                    $this->db->rollBack();
+                    http_response_code(400);
+                    echo json_encode([
+                        'message' => 'Ao marcar como recebido, indique preco_unitario_compra ou valor_total da compra.',
+                    ]);
+                    return;
+                }
+                $nf = isset($data['num_fatura']) ? trim((string) $data['num_fatura']) : null;
+                $dr = isset($data['data_recebido']) ? LucroCalculator::parseData($data['data_recebido'], date('Y-m-d')) : date('Y-m-d');
+                $this->pedido->marcarRecebido((int) $id, $puc, $vt, $nf, $dr);
+                LucroCalculator::registarPrecoIngrediente($this->db, $iid, $puc, $dr, (int) $id, $nf ? 'Pedido #' . $id . ' ' . $nf : 'Pedido #' . $id);
+                LucroCalculator::recalcularTodosCustosProdutos($this->db);
+            } else {
+                $this->pedido->setEstado((int) $id, $estado);
+            }
             $this->db->commit();
             echo json_encode(['message' => 'Pedido atualizado', 'pedido_id' => (int) $id, 'estado' => $estado]);
         } catch (Throwable $e) {

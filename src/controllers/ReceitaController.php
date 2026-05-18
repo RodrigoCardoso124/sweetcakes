@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../models/Receita.php';
 require_once __DIR__ . '/../helpers/Auth.php';
+require_once __DIR__ . '/../helpers/LucroCalculator.php';
 
 class ReceitaController
 {
@@ -76,6 +77,7 @@ class ReceitaController
             $id = $this->receita->create($clean);
             $this->receita->replaceLinhas($id, $clean['linhas']);
             $this->db->commit();
+            LucroCalculator::atualizarCustoEstimadoProduto($this->db, (int) $clean['produto_id']);
             http_response_code(201);
             echo json_encode(['message' => 'Receita criada', 'receita_id' => $id]);
         } catch (Throwable $e) {
@@ -113,6 +115,7 @@ class ReceitaController
             $this->receita->update($cid, $clean);
             $this->receita->replaceLinhas($cid, $clean['linhas']);
             $this->db->commit();
+            LucroCalculator::atualizarCustoEstimadoProduto($this->db, (int) $clean['produto_id']);
             echo json_encode(['message' => 'Receita atualizada', 'receita_id' => $cid]);
         } catch (Throwable $e) {
             $this->db->rollBack();

@@ -390,6 +390,34 @@ const API = {
 
     async updatePedidoIngrediente(id, data) {
         return apiRequest(`pedidos_ingrediente/${id}`, 'PUT', data);
+    },
+
+    async getFinancasResumo(de, ate) {
+        return apiRequest(`financas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}&view=resumo`);
+    },
+
+    async getFinancasProdutos(de, ate) {
+        return apiRequest(`financas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}&view=produtos`);
+    },
+
+    async getFinancasCaixa(de, ate) {
+        return apiRequest(`financas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}&view=caixa`);
+    },
+
+    async recalcularCustosProdutos() {
+        return apiRequest('financas/recalcular-custos');
+    },
+
+    async getDespesas(de, ate) {
+        return apiRequest(`despesas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`);
+    },
+
+    async createDespesa(data) {
+        return apiRequest('despesas', 'POST', data);
+    },
+
+    async deleteDespesa(id) {
+        return apiRequest(`despesas/${id}`, 'DELETE');
     }
 };
 

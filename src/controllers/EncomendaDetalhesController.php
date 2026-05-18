@@ -4,6 +4,7 @@ include_once __DIR__ . '/../models/Encomenda.php';
 include_once __DIR__ . '/../models/Produto.php';
 require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/EncomendaStockHelper.php';
+require_once __DIR__ . '/../helpers/LucroCalculator.php';
 
 class EncomendaDetalheController
 {
@@ -122,10 +123,13 @@ class EncomendaDetalheController
         }
 
         $qtyInt = EncomendaStockHelper::quantidadeParaInt($data['quantidade']);
+        $snap = LucroCalculator::snapshotParaLinha($this->db, (int) $data['produto_id']);
         $this->detalhe->encomenda_id = $data['encomenda_id'];
         $this->detalhe->produto_id = $data['produto_id'];
         $this->detalhe->quantidade = $data['quantidade'];
         $this->detalhe->especifico = $data['especifico'];
+        $this->detalhe->preco_unitario = $snap['preco_unitario'];
+        $this->detalhe->custo_unitario_estimado = $snap['custo_unitario_estimado'];
 
         try {
             $this->db->beginTransaction();

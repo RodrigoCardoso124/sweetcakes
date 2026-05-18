@@ -179,6 +179,8 @@ $routes = [
     'receitas' => 'ReceitaController',
     'producao' => 'ProducaoController',
     'pedidos_ingrediente' => 'PedidoIngredienteController',
+    'financas' => 'FinancasController',
+    'despesas' => 'DespesaController',
 ];
 
 /**
@@ -221,7 +223,7 @@ function sc_is_public_api_route(?string $resource, string $method): bool
  */
 function sc_route_requires_admin(?string $resource, string $method): bool
 {
-    $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores', 'pedidos_ingrediente'];
+    $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores', 'pedidos_ingrediente', 'financas', 'despesas'];
     if ($resource === 'pessoas' && $method === 'POST') {
         return false;
     }

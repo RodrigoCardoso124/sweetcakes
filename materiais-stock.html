@@ -22,6 +22,7 @@
                 <a href="promocoes.html" class="nav-item" data-admin-only="true"><span class="icon">🎁</span><span>Promoções</span></a>
                 <a href="funcionarios.html" class="nav-item" data-admin-only="true"><span class="icon">👔</span><span>Funcionários</span></a>
                 <a href="estatisticas.html" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas</span></a>
+                <a href="lucro.html" class="nav-item" data-admin-only="true"><span class="icon">💶</span><span>Lucro</span></a>
                 <a href="producao.html" class="nav-item"><span class="icon">🏭</span><span>Produção</span></a>
                 <a href="receitas.html" class="nav-item" data-admin-only="true"><span class="icon">📋</span><span>Receitas</span></a>
                 <a href="materiais-stock.html" class="nav-item active" data-admin-only="true"><span class="icon">🧂</span><span>Materiais</span></a>
@@ -42,7 +43,7 @@
                 </div>
             </header>
 
-            <p class="page-intro">Cria materiais novos, ajusta stock e mínimos de alerta. Regista pedidos ao fornecedor; quando marcares «Recebido», o stock aumenta automaticamente.</p>
+            <p class="page-intro">Define o <strong>preço por unidade</strong> (€/kg, €/L…) para calcular margens. Ao marcar pedido como recebido, regista quanto pagaste — actualiza stock e histórico de preços.</p>
 
             <div id="alertBanner" class="alert-banner" style="display:none;"></div>
 
@@ -69,6 +70,10 @@
                             <input type="number" id="novoIngMin" min="0" step="0.0001" value="0">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="novoIngPreco">Preço unitário (€, por unidade de stock)</label>
+                        <input type="number" id="novoIngPreco" min="0" step="0.0001" value="0">
+                    </div>
                     <button type="button" id="novoIngBtn" class="btn btn-primary">Criar material</button>
                 </div>
             </section>
@@ -83,6 +88,7 @@
                                 <th>Stock</th>
                                 <th>Mín.</th>
                                 <th>Unid.</th>
+                                <th>€/unid.</th>
                                 <th>Actualizar</th>
                                 <th>Pedido</th>
                             </tr>
@@ -103,6 +109,7 @@
                                 <th>Qtd</th>
                                 <th>Email forn.</th>
                                 <th>Estado</th>
+                                <th>Total €</th>
                                 <th>Data</th>
                                 <th></th>
                             </tr>
@@ -112,6 +119,31 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <div id="recModal" class="modal">
+        <div class="modal-content" style="max-width:440px;">
+            <span class="close" id="recClose">&times;</span>
+            <h3>Receber pedido</h3>
+            <input type="hidden" id="recPedId">
+            <p id="recPedInfo" class="muted"></p>
+            <div class="form-group">
+                <label for="recPrecoUnit">Preço unitário pago (€)</label>
+                <input type="number" id="recPrecoUnit" min="0" step="0.0001" required>
+            </div>
+            <div class="form-group">
+                <label for="recValorTotal">Valor total da compra (€, opcional)</label>
+                <input type="number" id="recValorTotal" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="recFatura">N.º fatura (opcional)</label>
+                <input type="text" id="recFatura" maxlength="80">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-primary" id="recSave">Confirmar receção</button>
+                <button type="button" class="btn btn-secondary" id="recCancel">Cancelar</button>
+            </div>
+        </div>
     </div>
 
     <div id="pedModal" class="modal">

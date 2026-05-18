@@ -8,6 +8,7 @@ class Ingredientes {
     public $quantidade_atual;
     public $unidade;
     public $quantidade_minima;
+    public $preco_unitario;
 
     public function __construct($db) {
         $this->conn = $db;
@@ -29,15 +30,35 @@ class Ingredientes {
     }
 
     public function create() {
-        $query = "INSERT INTO {$this->table}
-                    (nome, quantidade_atual, unidade, quantidade_minima)
-                  VALUES (:nome, :q_atual, :unidade, :q_min)";
+        $hasPreco = $this->columnExists('preco_unitario');
+        if ($hasPreco) {
+            $query = "INSERT INTO {$this->table}
+                        (nome, quantidade_atual, unidade, quantidade_minima, preco_unitario)
+                      VALUES (:nome, :q_atual, :unidade, :q_min, :preco)";
+        } else {
+            $query = "INSERT INTO {$this->table}
+                        (nome, quantidade_atual, unidade, quantidade_minima)
+                      VALUES (:nome, :q_atual, :unidade, :q_min)";
+        }
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":nome", $this->nome);
         $stmt->bindValue(":q_atual", $this->quantidade_atual);
         $stmt->bindValue(":unidade", $this->unidade);
         $stmt->bindValue(":q_min", $this->quantidade_minima);
+        if ($hasPreco) {
+            $stmt->bindValue(':preco', $this->preco_unitario ?? 0);
+        }
         return $stmt->execute();
+    }
+
+    private function columnExists(string $column): bool
+    {
+        $stmt = $this->conn->prepare(
+            'SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+        );
+        $stmt->execute([':t' => $this->table, ':c' => $column]);
+        return (int) $stmt->fetchColumn() > 0;
     }
 
     public function lastInsertId(): int
@@ -46,17 +67,19 @@ class Ingredientes {
     }
 
     public function update() {
-        $query = "UPDATE {$this->table}
-                  SET nome = :nome,
-                      quantidade_atual = :q_atual,
-                      unidade = :unidade,
-                      quantidade_minima = :q_min
-                  WHERE ingrediente_id = :id";
+        $sets = 'nome = :nome, quantidade_atual = :q_atual, unidade = :unidade, quantidade_minima = :q_min';
+        if ($this->columnExists('preco_unitario') && $this->preco_unitario !== null) {
+            $sets .= ', preco_unitario = :preco';
+        }
+        $query = "UPDATE {$this->table} SET {$sets} WHERE ingrediente_id = :id";
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":nome", $this->nome);
         $stmt->bindValue(":q_atual", $this->quantidade_atual);
         $stmt->bindValue(":unidade", $this->unidade);
         $stmt->bindValue(":q_min", $this->quantidade_minima);
+        if ($this->columnExists('preco_unitario') && $this->preco_unitario !== null) {
+            $stmt->bindValue(':preco', $this->preco_unitario);
+        }
         $stmt->bindValue(":id", $this->ingrediente_id);
         return $stmt->execute();
     }

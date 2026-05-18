@@ -11,14 +11,22 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pedClose').addEventListener('click', closePed);
   document.getElementById('pedCancel').addEventListener('click', closePed);
   document.getElementById('pedSave').addEventListener('click', savePed);
+  document.getElementById('recClose').addEventListener('click', closeRec);
+  document.getElementById('recCancel').addEventListener('click', closeRec);
+  document.getElementById('recSave').addEventListener('click', saveRec);
   window.addEventListener('click', (e) => {
     if (e.target.id === 'pedModal') closePed();
+    if (e.target.id === 'recModal') closeRec();
   });
   load();
 });
 
 function closePed() {
   document.getElementById('pedModal').classList.remove('active');
+}
+
+function closeRec() {
+  document.getElementById('recModal').classList.remove('active');
 }
 
 async function criarIngrediente() {
@@ -43,17 +51,20 @@ async function criarIngrediente() {
     return;
   }
   try {
+    const preco_unitario = parseFloat(document.getElementById('novoIngPreco').value) || 0;
     await API.createIngrediente({
       nome,
       unidade,
       quantidade_atual,
-      quantidade_minima
+      quantidade_minima,
+      preco_unitario
     });
     showToast('Material criado', 'success');
     document.getElementById('novoIngNome').value = '';
     document.getElementById('novoIngUnidade').value = '';
     document.getElementById('novoIngAtual').value = '0';
     document.getElementById('novoIngMin').value = '0';
+    document.getElementById('novoIngPreco').value = '0';
     load();
   } catch (e) {
     showToast(e.message || 'Erro', 'warning');
@@ -111,7 +122,11 @@ function renderIng(list) {
         i.quantidade_minima +
         '"></td><td>' +
         escapeHtml(i.unidade || '') +
-        '</td><td><button type="button" class="btn btn-primary btn-sm" data-save="' +
+        '</td><td><input type="number" step="0.0001" min="0" class="qty-input" data-preco="' +
+        i.ingrediente_id +
+        '" value="' +
+        (i.preco_unitario != null ? i.preco_unitario : 0) +
+        '"></td><td><button type="button" class="btn btn-primary btn-sm" data-save="' +
         i.ingrediente_id +
         '">Guardar</button></td><td><button type="button" class="btn btn-secondary btn-sm" data-ped="' +
         i.ingrediente_id +
@@ -126,13 +141,16 @@ function renderIng(list) {
       const row = btn.closest('tr');
       const atual = parseFloat(row.querySelector('[data-atual="' + id + '"]').value);
       const min = parseFloat(row.querySelector('[data-min="' + id + '"]').value);
+      const precoEl = row.querySelector('[data-preco="' + id + '"]');
+      const preco_unitario = precoEl ? parseFloat(precoEl.value) : 0;
       const ing = ingredientes.find((x) => String(x.ingrediente_id) === String(id));
       try {
         await API.updateIngrediente(id, {
           nome: ing.nome,
           quantidade_atual: atual,
           quantidade_minima: min,
-          unidade: ing.unidade
+          unidade: ing.unidade,
+          preco_unitario: Number.isNaN(preco_unitario) ? 0 : preco_unitario
         });
         showToast('Stock actualizado', 'success');
         load();
@@ -204,12 +222,14 @@ function renderPed(list) {
         '</td><td>' +
         escapeHtml(p.estado) +
         '</td><td>' +
+        (p.valor_total != null ? '€' + Number(p.valor_total).toFixed(2) : '—') +
+        '</td><td>' +
         escapeHtml((p.criado_em || '').substring(0, 16)) +
         '</td><td>' +
         (p.estado === 'pendente'
           ? '<button class="btn btn-primary btn-sm" data-rec="' +
             p.pedido_id +
-            '">Marcar recebido</button> <button class="btn btn-secondary btn-sm" data-can="' +
+            '">Receber</button> <button class="btn btn-secondary btn-sm" data-can="' +
             p.pedido_id +
             '">Cancelar</button>'
           : '') +
@@ -219,14 +239,18 @@ function renderPed(list) {
     .join('');
 
   tb.querySelectorAll('[data-rec]').forEach((b) =>
-    b.addEventListener('click', async () => {
-      try {
-        await API.updatePedidoIngrediente(b.getAttribute('data-rec'), { estado: 'recebido' });
-        showToast('Stock aumentado com a quantidade pedida', 'success');
-        load();
-      } catch (e) {
-        showToast(e.message, 'warning');
-      }
+    b.addEventListener('click', () => {
+      const pid = b.getAttribute('data-rec');
+      const ped = list.find((x) => String(x.pedido_id) === String(pid));
+      document.getElementById('recPedId').value = pid;
+      document.getElementById('recPedInfo').textContent = ped
+        ? ped.ingrediente_nome + ' — ' + ped.quantidade + ' ' + (ped.unidade || '')
+        : '';
+      document.getElementById('recPrecoUnit').value =
+        ped && ped.preco_unitario_compra != null ? ped.preco_unitario_compra : '';
+      document.getElementById('recValorTotal').value = '';
+      document.getElementById('recFatura').value = '';
+      document.getElementById('recModal').classList.add('active');
     })
   );
   tb.querySelectorAll('[data-can]').forEach((b) =>
@@ -241,6 +265,29 @@ function renderPed(list) {
       }
     })
   );
+}
+
+async function saveRec() {
+  const id = document.getElementById('recPedId').value;
+  const puc = parseFloat(document.getElementById('recPrecoUnit').value);
+  const vtRaw = document.getElementById('recValorTotal').value;
+  const vt = vtRaw !== '' ? parseFloat(vtRaw) : null;
+  const num_fatura = document.getElementById('recFatura').value.trim();
+  if (!(puc >= 0) || Number.isNaN(puc)) {
+    showToast('Indique o preço unitário pago', 'warning');
+    return;
+  }
+  const payload = { estado: 'recebido', preco_unitario_compra: puc };
+  if (vt != null && vt > 0) payload.valor_total = vt;
+  if (num_fatura) payload.num_fatura = num_fatura;
+  try {
+    await API.updatePedidoIngrediente(id, payload);
+    showToast('Pedido recebido — stock e preço actualizados', 'success');
+    closeRec();
+    load();
+  } catch (e) {
+    showToast(e.message, 'warning');
+  }
 }
 
 function escapeHtml(t) {
