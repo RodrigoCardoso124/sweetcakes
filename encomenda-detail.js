@@ -104,7 +104,25 @@ async function displayEncomenda(encomenda, cliente, detalhes) {
   statusBadge.textContent = formatStatus(encomenda.estado);
   statusBadge.className = `status-badge ${encomenda.estado ? encomenda.estado.replace('_', '-') : 'pendente'}`;
 
-  document.getElementById('orderTotal').textContent = fmtEuro(encomenda.total);
+  document.getElementById('orderTotal').textContent = fmtEuro(encomenda.total) + ' (c/ IVA)';
+
+  const contribCard = document.getElementById('faturaContribCard');
+  const contribInfo = document.getElementById('faturaContribInfo');
+  if (contribCard && contribInfo) {
+    const quer =
+      encomenda.quer_fatura_contribuinte === 1 ||
+      encomenda.quer_fatura_contribuinte === true ||
+      encomenda.quer_fatura_contribuinte === '1';
+    if (quer) {
+      contribCard.style.display = 'block';
+      contribInfo.textContent =
+        'Cliente pediu fatura com contribuinte' +
+        (encomenda.fatura_nif ? ' · NIF: ' + encomenda.fatura_nif : '');
+    } else {
+      contribCard.style.display = 'block';
+      contribInfo.textContent = 'Sem pedido de fatura com contribuinte (consumidor final na fatura).';
+    }
+  }
 
   document.getElementById('orderClientId').textContent = encomenda.cliente_id;
   document.getElementById('orderEmployeeId').textContent = encomenda.funcionario_id || 'N/A';
@@ -166,13 +184,12 @@ async function renderFaturaEncomenda(encomenda) {
     }
     const t = preview.totais || {};
     statusEl.textContent =
-      'Total com IVA estimado: ' +
+      'Total pago (c/ IVA): ' +
       fmtEuro(t.total_com_iva) +
-      ' (base ' +
+      ' → na fatura: base ' +
       fmtEuro(t.total_base) +
       ' + IVA ' +
-      fmtEuro(t.total_iva) +
-      ')';
+      fmtEuro(t.total_iva);
     if (btnEmit) {
       btnEmit.style.display = 'inline-block';
       btnEmit.onclick = async () => {

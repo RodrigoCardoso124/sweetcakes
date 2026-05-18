@@ -47,7 +47,7 @@ async function loadDespesas() {
   const banner = document.getElementById('despMigrateBanner');
   try {
     const r = await API.getFinancasMovimentos(de, ate);
-    if (banner) banner.style.display = 'none';
+    if (banner) banner.classList.add('hidden-banner');
     movimentosCache = r.movimentos || [];
     renderTabela(movimentosCache);
     const total = movimentosCache.reduce((acc, m) => acc + (parseFloat(m.valor) || 0), 0);
@@ -63,7 +63,7 @@ async function loadDespesas() {
     const msg = e.message || String(e);
     if (banner && (msg.indexOf('500') !== -1 || msg.indexOf('financas') !== -1)) {
       banner.textContent = 'Execute a migração: /api/migrate_008_financas.php';
-      banner.style.display = 'block';
+      banner.classList.remove('hidden-banner');
     }
     if (typeof showToast === 'function') showToast('Erro: ' + msg, 'warning');
   }

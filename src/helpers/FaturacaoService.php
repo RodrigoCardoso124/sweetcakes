@@ -78,7 +78,7 @@ class FaturacaoService
             return ['error' => 'Esta encomenda já tem fatura emitida'];
         }
 
-        $cliente = self::dadosCliente($db, (int) $enc['cliente_id']);
+        $cliente = self::dadosCliente($db, (int) $enc['cliente_id'], $enc);
         $linhas = self::linhasFromEncomenda($db, $encomendaId, $taxaPadrao);
         $desconto = (float) ($enc['desconto'] ?? 0);
         if ($desconto > 0) {
@@ -93,6 +93,9 @@ class FaturacaoService
             'totais' => $totais,
             'encomenda_total' => (float) ($enc['total'] ?? 0),
             'avisos' => self::avisosTotais($totais['total_com_iva'], (float) ($enc['total'] ?? 0)),
+            'precos_com_iva' => true,
+            'quer_fatura_contribuinte' => self::encomendaQuerFatura($enc),
+            'fatura_nif' => self::encomendaFaturaNif($enc),
         ];
     }
 
@@ -523,7 +526,7 @@ class FaturacaoService
             if (!empty($r['especifico'])) {
                 $desc .= ' — ' . trim((string) $r['especifico']);
             }
-            $calc = IvaHelper::linhaFromPrecoSemIva($qtd, $preco, $taxaPadrao);
+            $calc = IvaHelper::linhaFromPrecoComIva($qtd, $preco, $taxaPadrao);
             $linhas[] = array_merge($calc, [
                 'produto_id' => (int) $r['produto_id'],
                 'descricao' => $desc,
@@ -535,8 +538,7 @@ class FaturacaoService
 
     private static function linhaDesconto(float $desconto, float $taxa): array
     {
-        $desconto = round(max(0, $desconto), 2);
-        $calc = IvaHelper::linhaFromPrecoSemIva(1, -$desconto, $taxa);
+        $calc = IvaHelper::linhaDescontoComIva($desconto, $taxa);
 
         return array_merge($calc, [
             'produto_id' => null,
@@ -557,8 +559,8 @@ class FaturacaoService
             }
             $qtd = max(0.0001, (float) ($item['quantidade'] ?? 1));
             $taxa = self::taxaFromInput($item['taxa_iva_pct'] ?? $taxaPadrao);
-            $preco = (float) ($item['preco_unitario_sem_iva'] ?? $item['preco'] ?? 0);
-            $calc = IvaHelper::linhaFromPrecoSemIva($qtd, $preco, $taxa);
+            $preco = (float) ($item['preco_unitario_com_iva'] ?? $item['preco'] ?? 0);
+            $calc = IvaHelper::linhaFromPrecoComIva($qtd, $preco, $taxa);
             $linhas[] = array_merge($calc, [
                 'produto_id' => isset($item['produto_id']) ? (int) $item['produto_id'] : null,
                 'descricao' => $desc,
@@ -608,7 +610,7 @@ class FaturacaoService
         return $numero;
     }
 
-    private static function dadosCliente(PDO $db, int $pessoaId): array
+    private static function dadosCliente(PDO $db, int $pessoaId, ?array $encomenda = null): array
     {
         $stmt = $db->prepare('SELECT nome, email, telemovel, morada' .
             (self::columnExists($db, 'pessoas', 'nif') ? ', nif' : '') .
@@ -616,12 +618,73 @@ class FaturacaoService
         $stmt->execute([$pessoaId]);
         $p = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
+        $nif = self::normalizarNif($p['nif'] ?? null);
+        if ($encomenda && self::encomendaQuerFatura($encomenda)) {
+            $nifEnc = self::encomendaFaturaNif($encomenda);
+            if ($nifEnc) {
+                $nif = $nifEnc;
+            }
+        }
+
         return [
             'nome' => trim((string) ($p['nome'] ?? 'Cliente')) ?: 'Cliente',
-            'nif' => self::normalizarNif($p['nif'] ?? null),
+            'nif' => $nif,
             'morada' => trim((string) ($p['morada'] ?? '')) ?: null,
             'email' => trim((string) ($p['email'] ?? '')) ?: null,
         ];
+    }
+
+    public static function encomendaQuerFatura(?array $encomenda): bool
+    {
+        if (!$encomenda) {
+            return false;
+        }
+
+        return !empty($encomenda['quer_fatura_contribuinte'])
+            || !empty($encomenda['fatura_com_contribuinte']);
+    }
+
+    public static function encomendaFaturaNif(?array $encomenda): ?string
+    {
+        if (!$encomenda) {
+            return null;
+        }
+
+        return self::normalizarNif(
+            $encomenda['fatura_nif'] ?? $encomenda['nif_faturacao'] ?? null
+        );
+    }
+
+    /**
+     * Valida e opcionalmente grava NIF na ficha do cliente.
+     *
+     * @return array{error?: string, nif?: ?string}
+     */
+    public static function resolverNifEncomenda(PDO $db, int $clienteId, array $data): array
+    {
+        $quer = !empty($data['quer_fatura_contribuinte'])
+            || !empty($data['fatura_com_contribuinte']);
+        if (!$quer) {
+            return ['nif' => null];
+        }
+
+        $nif = self::normalizarNif($data['fatura_nif'] ?? $data['nif_faturacao'] ?? $data['nif'] ?? null);
+        if (!$nif && self::columnExists($db, 'pessoas', 'nif')) {
+            $stmt = $db->prepare('SELECT nif FROM pessoas WHERE pessoa_id = ? LIMIT 1');
+            $stmt->execute([$clienteId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            $nif = self::normalizarNif($row['nif'] ?? null);
+        }
+        if (!$nif) {
+            return ['error' => 'NIF é obrigatório para fatura com contribuinte'];
+        }
+
+        if (self::columnExists($db, 'pessoas', 'nif')) {
+            $upd = $db->prepare('UPDATE pessoas SET nif = :nif WHERE pessoa_id = :id');
+            $upd->execute([':nif' => $nif, ':id' => $clienteId]);
+        }
+
+        return ['nif' => $nif];
     }
 
     private static function avisosTotais(float $faturaTotal, float $encomendaTotal): array

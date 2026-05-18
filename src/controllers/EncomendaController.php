@@ -8,6 +8,8 @@ require_once __DIR__ . '/../helpers/Auth.php';
 require_once __DIR__ . '/../helpers/AuditHelper.php';
 require_once __DIR__ . '/../helpers/PromocaoHelper.php';
 require_once __DIR__ . '/../helpers/EncomendaStockHelper.php';
+require_once __DIR__ . '/../helpers/FaturacaoService.php';
+require_once __DIR__ . '/../helpers/LucroCalculator.php';
 
 class EncomendaController
 {
@@ -118,11 +120,25 @@ class EncomendaController
         echo json_encode($data);
     }
 
+    private function resolverFuncionarioIdParaApp(array $data): ?int
+    {
+        if (isset($data['funcionario_id']) && (int) $data['funcionario_id'] > 0) {
+            return (int) $data['funcionario_id'];
+        }
+        if (Auth::isAdmin() || Auth::isFuncionario()) {
+            return null;
+        }
+        $stmt = $this->db->query('SELECT funcionario_id FROM funcionarios ORDER BY funcionario_id ASC LIMIT 1');
+        $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
+
+        return $row ? (int) $row['funcionario_id'] : null;
+    }
+
     public function store($data)
     {
-        if (!isset($data['cliente_id'], $data['funcionario_id'], $data['estado'], $data['total'])) {
+        if (!isset($data['cliente_id'], $data['estado'], $data['total'])) {
             http_response_code(400);
-            echo json_encode(['message' => 'Campos obrigatórios: cliente_id, funcionario_id, estado, total']);
+            echo json_encode(['message' => 'Campos obrigatórios: cliente_id, estado, total']);
 
             return;
         }
@@ -130,6 +146,15 @@ class EncomendaController
         if (!Auth::isAdmin()) {
             $data['cliente_id'] = Auth::pessoaId();
         }
+
+        $funcId = $this->resolverFuncionarioIdParaApp($data);
+        if ($funcId === null) {
+            http_response_code(400);
+            echo json_encode(['message' => 'funcionario_id é obrigatório ou não existe funcionário na loja']);
+
+            return;
+        }
+        $data['funcionario_id'] = $funcId;
 
         $this->pessoa->pessoa_id = $data['cliente_id'];
         $stmt = $this->pessoa->getById();
@@ -180,13 +205,27 @@ class EncomendaController
             }
         }
 
-        $this->encomenda->cliente_id = $data['cliente_id'];
+        $clienteId = (int) $data['cliente_id'];
+        $nifFatura = null;
+        if (LucroCalculator::columnExists($this->db, 'encomendas', 'quer_fatura_contribuinte')) {
+            $nifRes = FaturacaoService::resolverNifEncomenda($this->db, $clienteId, $data);
+            if (!empty($nifRes['error'])) {
+                http_response_code(400);
+                echo json_encode(['message' => $nifRes['error']]);
+
+                return;
+            }
+            $nifFatura = $nifRes['nif'] ?? null;
+        }
+
+        $this->encomenda->cliente_id = $clienteId;
         $this->encomenda->funcionario_id = $data['funcionario_id'];
         $this->encomenda->estado = $data['estado'];
         $this->encomenda->total = $data['total'];
 
         if ($this->encomenda->create()) {
-            $encomendaId = $this->db->lastInsertId();
+            $encomendaId = (int) $this->db->lastInsertId();
+            $this->aplicarFaturaEncomenda($encomendaId, $data, $nifFatura);
             if ($promocaoId !== null && $promocaoId > 0 && $encomendaId) {
                 try {
                     $upd = $this->db->prepare('UPDATE encomendas SET promocao_id = :p, desconto = :d WHERE encomenda_id = :id');
@@ -213,13 +252,19 @@ class EncomendaController
             }
 
             http_response_code(201);
-            echo json_encode([
+            $resp = [
                 'message' => 'Encomenda criada com sucesso',
                 'encomenda_id' => $encomendaId,
-                'total' => (float)$data['total'],
+                'total' => (float) $data['total'],
                 'desconto' => $desconto,
                 'promocao_id' => $promocaoId,
-            ]);
+            ];
+            if (LucroCalculator::columnExists($this->db, 'encomendas', 'quer_fatura_contribuinte')) {
+                $resp['quer_fatura_contribuinte'] = !empty($data['quer_fatura_contribuinte'])
+                    || !empty($data['fatura_com_contribuinte']);
+                $resp['fatura_nif'] = $nifFatura;
+            }
+            echo json_encode($resp);
         } else {
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao criar encomenda']);
@@ -437,5 +482,17 @@ class EncomendaController
             http_response_code(500);
             echo json_encode(['message' => 'Erro ao remover encomenda']);
         }
+    }
+
+    private function aplicarFaturaEncomenda(int $encomendaId, array $data, ?string $nifResolvido): void
+    {
+        if (!LucroCalculator::columnExists($this->db, 'encomendas', 'quer_fatura_contribuinte')) {
+            return;
+        }
+        $quer = !empty($data['quer_fatura_contribuinte']) || !empty($data['fatura_com_contribuinte']);
+        $stmt = $this->db->prepare(
+            'UPDATE encomendas SET quer_fatura_contribuinte = ?, fatura_nif = ? WHERE encomenda_id = ?'
+        );
+        $stmt->execute([$quer ? 1 : 0, $quer ? $nifResolvido : null, $encomendaId]);
     }
 }

@@ -41,7 +41,7 @@ function setupEventListeners() {
 
 async function loadClientes() {
     const tbody = document.getElementById('clientesTableBody');
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">Carregando clientes...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando clientes...</td></tr>';
 
     try {
         allClientes = await API.getPessoas();
@@ -58,7 +58,7 @@ function renderClientes(clientes) {
     const pagination = document.getElementById('clientesPagination');
     
     if (clientes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="loading">Nenhum cliente encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="loading">Nenhum cliente encontrado</td></tr>';
         if (pagination) pagination.innerHTML = '';
         return;
     }
@@ -79,6 +79,7 @@ function renderClientes(clientes) {
                 <td>${escapeHtml(cliente.nome || 'N/A')}</td>
                 <td>${escapeHtml(cliente.email || 'N/A')}</td>
                 <td>${escapeHtml(cliente.telemovel || 'N/A')}</td>
+                <td>${escapeHtml(cliente.nif || '—')}</td>
                 <td>${escapeHtml(cliente.morada || 'N/A')}</td>
                 <td>${dataRegisto}</td>
                 <td class="actions-cell">

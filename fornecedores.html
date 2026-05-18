@@ -9,26 +9,13 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body data-page-scope="admin">
-    
     <div class="admin-container">
         <aside class="sidebar" id="admin-sidebar">
             <div class="sidebar-header">
                 <h1>🍰 Sweet Cakes</h1>
                 <p>Painel Administrativo</p>
             </div>
-            <nav class="sidebar-nav">
-                <a href="index.html" class="nav-item"><span class="icon">📦</span><span>Encomendas</span></a>
-                <a href="clientes.html" class="nav-item" data-admin-only="true"><span class="icon">👥</span><span>Clientes</span></a>
-                <a href="produtos.html" class="nav-item"><span class="icon">🍰</span><span>Produtos</span></a>
-                <a href="promocoes.html" class="nav-item" data-admin-only="true"><span class="icon">🎁</span><span>Promoções</span></a>
-                <a href="funcionarios.html" class="nav-item" data-admin-only="true"><span class="icon">👔</span><span>Funcionários</span></a>
-                <a href="estatisticas.html#sec-lucro" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas & Lucro</span></a>
-                <a href="despesas.html" class="nav-item" data-admin-only="true"><span class="icon">💸</span><span>Despesas</span></a>
-                <a href="fornecedores.html" class="nav-item active" data-admin-only="true"><span class="icon">🏢</span><span>Fornecedores</span></a>
-                <a href="producao.html" class="nav-item"><span class="icon">🏭</span><span>Produção</span></a>
-                <a href="receitas.html" class="nav-item" data-admin-only="true"><span class="icon">📋</span><span>Receitas</span></a>
-                <a href="materiais-stock.html" class="nav-item" data-admin-only="true"><span class="icon">🧂</span><span>Materiais</span></a>
-            </nav>
+            <nav class="sidebar-nav" aria-label="Menu principal"></nav>
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">Sair</button>
             </div>
@@ -36,11 +23,12 @@
 
         <main class="main-content">
             <header class="header">
-                
-                
                 <div class="header-left">
                     <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
-                    <h2>Fornecedores</h2>
+                    <div>
+                        <h2>Fornecedores</h2>
+                        <p class="header-subtitle">Empresas e contactos para pedidos de materiais.</p>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <button type="button" id="addFornecedorBtn" class="btn btn-primary">+ Novo fornecedor</button>
@@ -95,8 +83,7 @@
                         <input type="text" id="fornTelemovel" maxlength="30">
                     </div>
                 </div>
-                
-                <div class="form-actions">
+                <div class="form-actions modal-footer-actions">
                     <button type="button" id="cancelFornecedorBtn" class="btn btn-secondary">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>

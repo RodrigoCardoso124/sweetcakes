@@ -80,11 +80,17 @@ Você pode alterar o estado de uma encomenda para:
 2. **Estatísticas** — secção Lucro (ganhos de encomendas entregues − despesas) e margem por produto
 3. **Despesas** — registo manual; compras ao fornecedor entram ao marcar pedido como Recebido em **Materiais**
 4. **Fornecedores** — cadastro de empresas fornecedoras
-5. **Faturação** (`faturacao.html`) — emitir faturas (encomendas entregues), registar documentos de fornecedor, resumo de IVA, export CSV para contabilidade/AT (informativo; não substitui software certificado).
+5. **Faturação** (`faturacao.html`) — preços **com IVA incluído**; na fatura calcula-se base + IVA; emitir a partir de encomendas entregues.
 
-### Migração faturação
+### Migrações
 
-`/api/migrate_009_faturacao.php` — tabelas de faturas, IVA nas despesas, NIF nos clientes, dados da empresa.
+- `/api/migrate_009_faturacao.php` — faturas, IVA nas despesas, NIF em clientes
+- `/api/migrate_010_encomenda_fatura.php` — pedido de fatura com contribuinte na encomenda
+- `/api/migrate_011_backfill_nifs.php` — atribui NIF válido a clientes que ainda não têm
+
+### App cliente — fatura na encomenda
+
+Ver `docs/API_ENCOMENDA_FATURA.md` (`quer_fatura_contribuinte`, `fatura_nif`).
 
 ## 🔧 Configuração
 

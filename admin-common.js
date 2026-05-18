@@ -108,7 +108,9 @@ async function syncSessionRoleFromServer() {
     localStorage.setItem('adminFuncionarioId', String(session.funcionario_id || ''));
     localStorage.setItem('adminIsAdmin', session.is_admin ? 'true' : 'false');
     if (!enforcePageRole()) return;
+    buildAdminSidebarNav();
     applyRoleVisibility();
+    initSidebarNavActive();
   } catch (e) {
     if (e && e.status === 401) {
       clearAdminSession();
@@ -147,15 +149,58 @@ async function bindAdminLogout(buttonId) {
   });
 }
 
+/** Menu lateral único — mesma ordem e links em todas as páginas do painel. */
+var ADMIN_NAV_ITEMS = [
+  { href: 'index.html', icon: '📦', label: 'Encomendas' },
+  { href: 'clientes.html', icon: '👥', label: 'Clientes', adminOnly: true },
+  { href: 'produtos.html', icon: '🍰', label: 'Produtos' },
+  { href: 'promocoes.html', icon: '🎁', label: 'Promoções', adminOnly: true },
+  { href: 'funcionarios.html', icon: '👔', label: 'Funcionários', adminOnly: true },
+  { href: 'estatisticas.html', icon: '📊', label: 'Estatísticas', adminOnly: true },
+  { href: 'despesas.html', icon: '💸', label: 'Despesas', adminOnly: true },
+  { href: 'fornecedores.html', icon: '🏢', label: 'Fornecedores', adminOnly: true },
+  { href: 'faturacao.html', icon: '🧾', label: 'Faturação', adminOnly: true },
+  { href: 'producao.html', icon: '🏭', label: 'Produção' },
+  { href: 'receitas.html', icon: '📋', label: 'Receitas', adminOnly: true },
+  { href: 'materiais-stock.html', icon: '🧂', label: 'Materiais', adminOnly: true }
+];
+
+function buildAdminSidebarNav() {
+  var nav = document.querySelector('.sidebar-nav');
+  if (!nav) return;
+
+  nav.innerHTML = '';
+  ADMIN_NAV_ITEMS.forEach(function (item) {
+    var a = document.createElement('a');
+    a.href = item.href;
+    a.className = 'nav-item';
+    if (item.adminOnly) {
+      a.setAttribute('data-admin-only', 'true');
+    }
+    a.innerHTML =
+      '<span class="icon">' +
+      item.icon +
+      '</span><span class="nav-label">' +
+      item.label +
+      '</span>';
+    nav.appendChild(a);
+  });
+}
+
 function initSidebarNavActive() {
   var path = window.location.pathname || '';
   var file = path.split('/').pop() || 'index.html';
+  if (!file || file.indexOf('.html') === -1) file = 'index.html';
+
   document.querySelectorAll('.sidebar-nav .nav-item').forEach(function (a) {
-    var href = (a.getAttribute('href') || '').split('/').pop();
-    if (href === file) {
+    var href = a.getAttribute('href') || '';
+    var hrefFile = href.split('#')[0].split('/').pop() || '';
+    if (hrefFile === file) {
       a.classList.add('active');
+      a.setAttribute('aria-current', 'page');
     } else {
       a.classList.remove('active');
+      a.removeAttribute('aria-current');
     }
   });
 }
@@ -197,9 +242,10 @@ function initAdminMobileNav() {
 function initAdminShell() {
   if (!requireAdminPageAuth()) return false;
   if (!enforcePageRole()) return false;
+  buildAdminSidebarNav();
   applyRoleVisibility();
-  syncSessionRoleFromServer();
   initSidebarNavActive();
+  syncSessionRoleFromServer();
   bindAdminLogout('logoutBtn');
   initAdminMobileNav();
   return true;

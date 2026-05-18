@@ -56,10 +56,10 @@ function switchTab(tab) {
     b.classList.toggle('active', b.getAttribute('data-tab') === tab);
   });
   document.querySelectorAll('.fat-panel').forEach((p) => {
-    p.style.display = 'none';
+    p.classList.remove('fat-panel--active');
   });
   const panel = document.getElementById('panel-' + tab);
-  if (panel) panel.style.display = 'block';
+  if (panel) panel.classList.add('fat-panel--active');
 }
 
 async function loadConfig() {
@@ -82,12 +82,12 @@ async function loadAll() {
   const banner = document.getElementById('fatMigrateBanner');
   try {
     await Promise.all([loadEmitidas(), loadRecebidas(), loadResumoIva()]);
-    if (banner) banner.style.display = 'none';
+    if (banner) banner.classList.add('hidden-banner');
   } catch (e) {
     const msg = e.message || String(e);
     if (banner && (msg.indexOf('503') !== -1 || msg.indexOf('009') !== -1 || msg.indexOf('faturacao') !== -1)) {
       banner.textContent = 'Execute a migração: /api/migrate_009_faturacao.php';
-      banner.style.display = 'block';
+      banner.classList.remove('hidden-banner');
     }
     if (typeof showToast === 'function') showToast(msg, 'warning');
   }
@@ -197,13 +197,13 @@ async function loadResumoIva() {
   const deb = r.iva_debito || {};
   const cred = r.iva_credito || {};
   document.getElementById('ivaCards').innerHTML =
-    '<div class="stat-card stat-card--compact"><div class="stat-icon">📤</motion></div><div class="stat-info"><h3>' +
+    '<div class="stat-card stat-card--compact"><div class="stat-icon">📤</div><div class="stat-info"><h3>' +
     fmtEuro(deb.iva) +
     '</h3><p>IVA debitado (vendas)</p></div></div>' +
     '<div class="stat-card stat-card--compact"><div class="stat-icon">📥</div><div class="stat-info"><h3>' +
     fmtEuro(cred.iva) +
     '</h3><p>IVA dedutível (compras)</p></div></div>' +
-    '<motion></motion><div class="stat-card stat-card--compact"><div class="stat-icon">🧮</div><div class="stat-info"><h3>' +
+    '<div class="stat-card stat-card--compact"><div class="stat-icon">🧮</div><div class="stat-info"><h3>' +
     fmtEuro(r.iva_liquidar_estimado) +
     '</h3><p>IVA a liquidar (est.)</p></div></div>';
   document.getElementById('ivaNota').textContent = r.nota || '';
@@ -342,10 +342,10 @@ async function verFatura(id) {
           '</td><td>' +
           l.quantidade +
           '</td><td>' +
-          fmtEuro(l.preco_unitario_sem_iva) +
-          '</td><td>' +
-          l.taxa_iva_pct +
-          '%</td><td>' +
+        fmtEuro(l.preco_unitario_com_iva != null ? l.preco_unitario_com_iva : l.total_linha / l.quantidade) +
+        '</td><td>' +
+        l.taxa_iva_pct +
+        '%</td><td>' +
           fmtEuro(l.base_linha) +
           '</td><td>' +
           fmtEuro(l.iva_linha) +
@@ -378,7 +378,8 @@ async function verFatura(id) {
       '<br>' +
       escapeHtml(f.cliente_morada || '') +
       '</p>' +
-      '<table class="orders-table fatura-linhas"><thead><tr><th>Descrição</th><th>Qtd</th><th>Preço s/IVA</th><th>IVA</th><th>Base</th><th>IVA €</th><th>Total</th></tr></thead><tbody>' +
+      '<p class="muted" style="margin-bottom:10px;">Valores pagos pelo cliente já incluíam IVA; abaixo a repartição para a fatura.</p>' +
+      '<table class="orders-table fatura-linhas"><thead><tr><th>Descrição</th><th>Qtd</th><th>Preço c/IVA</th><th>Taxa</th><th>Base</th><th>IVA €</th><th>Total</th></tr></thead><tbody>' +
       linhas +
       '</tbody></table>' +
       '<p class="fatura-totais">Base: ' +

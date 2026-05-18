@@ -20,6 +20,29 @@ class IvaHelper
         return ['base' => $base, 'iva' => $iva, 'total' => $totalComIva, 'taxa' => $taxaPct];
     }
 
+    /**
+     * Preço de catálogo / encomenda já inclui IVA (preço final ao cliente).
+     */
+    public static function linhaFromPrecoComIva(float $qtd, float $precoUnitarioComIva, float $taxaPct): array
+    {
+        $qtd = max(0.0001, (float) $qtd);
+        $precoUnitarioComIva = max(0, (float) $precoUnitarioComIva);
+        $taxaPct = max(0, min(100, (float) $taxaPct));
+        $totalLinha = round($qtd * $precoUnitarioComIva, 2);
+        $split = self::splitTotalComIva($totalLinha, $taxaPct);
+        $precoSemIvaUnit = $qtd > 0 ? round($split['base'] / $qtd, 4) : 0.0;
+
+        return [
+            'quantidade' => $qtd,
+            'preco_unitario_com_iva' => round($precoUnitarioComIva, 4),
+            'preco_unitario_sem_iva' => $precoSemIvaUnit,
+            'taxa_iva_pct' => $taxaPct,
+            'base_linha' => $split['base'],
+            'iva_linha' => $split['iva'],
+            'total_linha' => $split['total'],
+        ];
+    }
+
     public static function linhaFromPrecoSemIva(float $qtd, float $precoSemIva, float $taxaPct): array
     {
         $qtd = max(0.0001, (float) $qtd);
@@ -36,6 +59,26 @@ class IvaHelper
             'base_linha' => $base,
             'iva_linha' => $iva,
             'total_linha' => $total,
+        ];
+    }
+
+    /** Linha de desconto quando o valor descontado já inclui IVA. */
+    public static function linhaDescontoComIva(float $valorDescontoComIva, float $taxaPct): array
+    {
+        $valorDescontoComIva = round(max(0, $valorDescontoComIva), 2);
+        if ($valorDescontoComIva <= 0) {
+            return self::linhaFromPrecoComIva(1, 0, $taxaPct);
+        }
+        $split = self::splitTotalComIva($valorDescontoComIva, $taxaPct);
+
+        return [
+            'quantidade' => 1,
+            'preco_unitario_com_iva' => round(-$valorDescontoComIva, 4),
+            'preco_unitario_sem_iva' => round(-$split['base'], 4),
+            'taxa_iva_pct' => $taxaPct,
+            'base_linha' => round(-$split['base'], 2),
+            'iva_linha' => round(-$split['iva'], 2),
+            'total_linha' => round(-$split['total'], 2),
         ];
     }
 
