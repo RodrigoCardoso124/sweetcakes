@@ -22,6 +22,7 @@
                 <a href="promocoes.html" class="nav-item" data-admin-only="true"><span class="icon">🎁</span><span>Promoções</span></a>
                 <a href="funcionarios.html" class="nav-item" data-admin-only="true"><span class="icon">👔</span><span>Funcionários</span></a>
                 <a href="estatisticas.html#sec-lucro" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas & Lucro</span></a>
+                <a href="despesas.html" class="nav-item" data-admin-only="true"><span class="icon">💸</span><span>Despesas</span></a>
                 <a href="producao.html" class="nav-item"><span class="icon">🏭</span><span>Produção</span></a>
                 <a href="receitas.html" class="nav-item" data-admin-only="true"><span class="icon">📋</span><span>Receitas</span></a>
                 <a href="materiais-stock.html" class="nav-item active" data-admin-only="true"><span class="icon">🧂</span><span>Materiais</span></a>
@@ -43,7 +44,7 @@
                 </div>
             </header>
 
-            <p class="page-intro">Define o <strong>preço por unidade</strong> (€/kg, €/L…) para calcular margens. Ao marcar pedido como recebido, regista quanto pagaste — actualiza stock e histórico de preços.</p>
+            <p class="page-intro">Gere stock e pedidos ao fornecedor. Ao marcar um pedido como <strong>recebido</strong>, regista o <strong>valor total pago</strong> (€) — entra nas despesas e actualiza o lucro em Estatísticas.</p>
 
             <div id="alertBanner" class="alert-banner" style="display:none;"></div>
 
@@ -70,10 +71,6 @@
                             <input type="number" id="novoIngMin" min="0" step="0.0001" value="0">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="novoIngPreco">Preço unitário (€, por unidade de stock)</label>
-                        <input type="number" id="novoIngPreco" min="0" step="0.0001" value="0">
-                    </div>
                     <button type="button" id="novoIngBtn" class="btn btn-primary">Criar material</button>
                 </div>
             </section>
@@ -88,8 +85,6 @@
                                 <th>Stock</th>
                                 <th>Mín.</th>
                                 <th>Unid.</th>
-                                <th>€/unid.</th>
-                                <th title="Soma dos pedidos pendentes × preço actual (estimativa)">Pendente € est.</th>
                                 <th>Actualizar</th>
                                 <th>Pedido</th>
                             </tr>
@@ -111,7 +106,6 @@
                                 <th>Qtd</th>
                                 <th>Email forn.</th>
                                 <th>Estado</th>
-                                <th>Est. €</th>
                                 <th>Total €</th>
                                 <th>Data</th>
                                 <th></th>
@@ -131,18 +125,13 @@
             <input type="hidden" id="recPedId">
             <p id="recPedInfo" class="muted"></p>
             <div class="form-group">
-                <label for="recPrecoUnit">Preço unitário pago (€)</label>
-                <input type="number" id="recPrecoUnit" min="0" step="0.0001" required>
-            </div>
-            <div class="form-group">
-                <label for="recValorTotal">Valor total da compra (€, opcional)</label>
-                <input type="number" id="recValorTotal" min="0" step="0.01">
+                <label for="recValorTotal">Valor total pago (€)</label>
+                <input type="number" id="recValorTotal" min="0.01" step="0.01" required>
             </div>
             <div class="form-group">
                 <label for="recFatura">N.º fatura (opcional)</label>
                 <input type="text" id="recFatura" maxlength="80">
             </div>
-            <p id="recEstimativa" class="muted" style="margin:0 0 12px;font-size:13px;"></p>
             <div class="modal-actions">
                 <button type="button" class="btn btn-primary" id="recSave">Confirmar receção</button>
                 <button type="button" class="btn btn-secondary" id="recCancel">Cancelar</button>

@@ -73,23 +73,16 @@ class PedidoIngrediente
 
     public function marcarRecebido(
         int $id,
-        float $precoUnitarioCompra,
-        ?float $valorTotal,
+        float $valorTotal,
         ?string $numFatura,
         ?string $dataRecebido
     ): bool {
         $dataRecebido = $dataRecebido ?: date('Y-m-d');
-        if ($valorTotal === null || $valorTotal <= 0) {
-            $row = $this->getById($id);
-            $q = $row ? (float) ($row['quantidade'] ?? 0) : 0;
-            $valorTotal = round($precoUnitarioCompra * $q, 2);
-        }
         $stmt = $this->conn->prepare(
             'UPDATE pedidos_ingrediente SET estado = \'recebido\',
-             preco_unitario_compra = :puc, valor_total = :vt, num_fatura = :nf, data_recebido = :dr
+             preco_unitario_compra = NULL, valor_total = :vt, num_fatura = :nf, data_recebido = :dr
              WHERE pedido_id = :id'
         );
-        $stmt->bindValue(':puc', $precoUnitarioCompra);
         $stmt->bindValue(':vt', $valorTotal);
         if ($numFatura !== null && $numFatura !== '') {
             $stmt->bindValue(':nf', $numFatura);

@@ -37,11 +37,7 @@ function setupLucro() {
     var ateEl = document.getElementById('lucroAte');
     if (deEl) deEl.value = de.toISOString().slice(0, 10);
     if (ateEl) ateEl.value = ate.toISOString().slice(0, 10);
-    if (document.getElementById('lucroDespData')) {
-        document.getElementById('lucroDespData').value = ate.toISOString().slice(0, 10);
-    }
     document.getElementById('lucroAplicarBtn').addEventListener('click', loadLucro);
-    document.getElementById('lucroDespAddBtn').addEventListener('click', addLucroDespesa);
     loadLucro();
 }
 
@@ -71,7 +67,7 @@ async function loadLucro() {
         if (pf.pendentes > 0) {
             pend.textContent =
                 pf.pendentes +
-                ' pedido(s) ao fornecedor ainda não recebidos — ainda não entram nas despesas. Quando chegarem, marca «Recebido» em Materiais e indica o preço.';
+                ' pedido(s) ao fornecedor ainda não recebidos — ainda não entram nas despesas. Quando chegarem, marca «Recebido» em Materiais com o valor total pago.';
             pend.style.display = 'block';
         } else {
             pend.style.display = 'none';
@@ -82,7 +78,6 @@ async function loadLucro() {
             notas.push(r.notas.linhas_sem_custo + ' venda(s) sem custo estimado (receita/preço material em falta).');
         }
         document.getElementById('lucroNotas').textContent = notas.join(' ');
-        renderLucroMovimentos(r.movimentos_despesa || []);
     } catch (e) {
         var msg = e.message || String(e);
         if (mig && (msg.indexOf('500') !== -1 || msg.indexOf('financas') !== -1)) {
@@ -91,68 +86,6 @@ async function loadLucro() {
         }
         if (typeof showToast === 'function') showToast('Lucro: ' + msg, 'warning');
     }
-}
-
-function renderLucroMovimentos(list) {
-    var tb = document.querySelector('#tblLucroMov tbody');
-    if (!tb) return;
-    if (!list.length) {
-        tb.innerHTML =
-            '<tr><td colspan="4" class="table-empty-msg">Sem despesas no período. Compras aparecem ao marcar pedidos como recebidos em Materiais.</td></tr>';
-        return;
-    }
-    var labels = {
-        compra_fornecedor: 'Fornecedor (recebido)',
-        material: 'Material',
-        embalagem: 'Embalagem',
-        equipamento: 'Equipamento',
-        servicos: 'Serviços',
-        outro: 'Outro'
-    };
-    tb.innerHTML = list
-        .map(function (m) {
-            return (
-                '<tr><td>' +
-                escapeHtmlLucro(m.data) +
-                '</td><td>' +
-                escapeHtmlLucro(labels[m.tipo] || m.tipo) +
-                '</td><td>' +
-                escapeHtmlLucro(m.descricao) +
-                (m.detalhe ? ' <span class="muted">' + escapeHtmlLucro(m.detalhe) + '</span>' : '') +
-                '</td><td>' +
-                fmtEuro(m.valor) +
-                '</td></tr>'
-            );
-        })
-        .join('');
-}
-
-async function addLucroDespesa() {
-    var payload = {
-        tipo: document.getElementById('lucroDespTipo').value,
-        descricao: document.getElementById('lucroDespDesc').value.trim(),
-        valor: parseFloat(document.getElementById('lucroDespValor').value),
-        data_despesa: document.getElementById('lucroDespData').value
-    };
-    if (!payload.descricao || !(payload.valor > 0)) {
-        if (typeof showToast === 'function') showToast('Descrição e valor obrigatórios', 'warning');
-        return;
-    }
-    try {
-        await API.createDespesa(payload);
-        if (typeof showToast === 'function') showToast('Despesa registada', 'success');
-        document.getElementById('lucroDespDesc').value = '';
-        document.getElementById('lucroDespValor').value = '';
-        loadLucro();
-    } catch (e) {
-        if (typeof showToast === 'function') showToast(e.message, 'warning');
-    }
-}
-
-function escapeHtmlLucro(t) {
-    var d = document.createElement('div');
-    d.textContent = t == null ? '' : String(t);
-    return d.innerHTML;
 }
 
 function ensureArray(value) {

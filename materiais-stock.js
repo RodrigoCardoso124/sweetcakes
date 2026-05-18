@@ -15,8 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('recClose').addEventListener('click', closeRec);
   document.getElementById('recCancel').addEventListener('click', closeRec);
   document.getElementById('recSave').addEventListener('click', saveRec);
-  document.getElementById('recPrecoUnit').addEventListener('input', updateRecEstimativa);
-  document.getElementById('recValorTotal').addEventListener('input', updateRecEstimativa);
   window.addEventListener('click', (e) => {
     if (e.target.id === 'pedModal') closePed();
     if (e.target.id === 'recModal') closeRec();
@@ -36,7 +34,6 @@ function closeRec() {
 function resetRecModal() {
   document.querySelector('#recModal .modal-actions').style.display = '';
   document.getElementById('recLucroWrap').style.display = 'none';
-  document.getElementById('recEstimativa').textContent = '';
 }
 
 function fmtEuro(n) {
@@ -44,45 +41,10 @@ function fmtEuro(n) {
   return '€' + Number(n).toFixed(2);
 }
 
-function precoIngrediente(ingredienteId) {
-  const ing = ingredientes.find(
-    (x) => String(x.ingrediente_id) === String(ingredienteId)
-  );
-  const p = ing ? parseFloat(ing.preco_unitario) : 0;
-  return Number.isNaN(p) || p < 0 ? 0 : p;
-}
-
-/** Soma qty dos pedidos pendentes × preço de catálogo actual (informativo). */
-function pendenteEstimadoIngrediente(ingredienteId) {
-  let total = 0;
-  pedidos.forEach((p) => {
-    if (p.estado !== 'pendente') return;
-    if (String(p.ingrediente_id) !== String(ingredienteId)) return;
-    const q = parseFloat(p.quantidade);
-    if (Number.isNaN(q) || q <= 0) return;
-    total += q * precoIngrediente(ingredienteId);
-  });
-  return total;
-}
-
-function totalPendenteEstimado() {
-  return pedidos
-    .filter((p) => p.estado === 'pendente')
-    .reduce((acc, p) => acc + (estimativaPedido(p) || 0), 0);
-}
-
-function estimativaPedido(p) {
-  if (p.estado !== 'pendente') return null;
-  const q = parseFloat(p.quantidade);
-  if (Number.isNaN(q) || q <= 0) return null;
-  return q * precoIngrediente(p.ingrediente_id);
-}
-
 function renderPedidosPendentesBar() {
   const bar = document.getElementById('pedidosPendentesBar');
   if (!bar) return;
   const n = pedidos.filter((p) => p.estado === 'pendente').length;
-  const total = totalPendenteEstimado();
   if (!n) {
     bar.style.display = 'none';
     bar.innerHTML = '';
@@ -92,33 +54,8 @@ function renderPedidosPendentesBar() {
   bar.innerHTML =
     '<strong>' +
     n +
-    ' pedido(s) pendente(s)</strong> — valor estimado (preço de catálogo actual): <strong>' +
-    fmtEuro(total) +
-    '</strong>. Só entra nas despesas ao marcar <em>Recebido</em>. ' +
+    ' pedido(s) pendente(s)</strong>. Ao receber, indica o <strong>valor total pago</strong> — só entra nas despesas. ' +
     '<a href="estatisticas.html#sec-lucro">Ver lucro em Estatísticas</a>';
-}
-
-let recPedidoActual = null;
-
-function updateRecEstimativa() {
-  const el = document.getElementById('recEstimativa');
-  if (!el || !recPedidoActual) return;
-  const q = parseFloat(recPedidoActual.quantidade);
-  const puc = parseFloat(document.getElementById('recPrecoUnit').value);
-  const vtRaw = document.getElementById('recValorTotal').value;
-  const cat = precoIngrediente(recPedidoActual.ingrediente_id);
-  let parts = [];
-  if (!Number.isNaN(q) && q > 0 && cat > 0) {
-    parts.push('Catálogo actual: ' + fmtEuro(q * cat));
-  }
-  if (!Number.isNaN(puc) && puc >= 0 && !Number.isNaN(q) && q > 0) {
-    parts.push('Com preço indicado: ' + fmtEuro(q * puc));
-  }
-  if (vtRaw !== '') {
-    const vt = parseFloat(vtRaw);
-    if (!Number.isNaN(vt) && vt > 0) parts.push('Total indicado: ' + fmtEuro(vt));
-  }
-  el.textContent = parts.length ? parts.join(' · ') : '';
 }
 
 async function criarIngrediente() {
@@ -143,20 +80,17 @@ async function criarIngrediente() {
     return;
   }
   try {
-    const preco_unitario = parseFloat(document.getElementById('novoIngPreco').value) || 0;
     await API.createIngrediente({
       nome,
       unidade,
       quantidade_atual,
-      quantidade_minima,
-      preco_unitario
+      quantidade_minima
     });
     showToast('Material criado', 'success');
     document.getElementById('novoIngNome').value = '';
     document.getElementById('novoIngUnidade').value = '';
     document.getElementById('novoIngAtual').value = '0';
     document.getElementById('novoIngMin').value = '0';
-    document.getElementById('novoIngPreco').value = '0';
     load();
   } catch (e) {
     showToast(e.message || 'Erro', 'warning');
@@ -201,13 +135,6 @@ function renderIng(list) {
       const low =
         parseFloat(i.quantidade_minima) > 0 &&
         parseFloat(i.quantidade_atual) <= parseFloat(i.quantidade_minima);
-      const pend = pendenteEstimadoIngrediente(i.ingrediente_id);
-      const pendCell =
-        pend > 0
-          ? '<span class="pendente-est" title="Pedidos pendentes × preço actual">' +
-            fmtEuro(pend) +
-            '</span>'
-          : '<span class="muted">—</span>';
       return (
         '<tr' +
         (low ? ' class="row-warn"' : '') +
@@ -223,12 +150,6 @@ function renderIng(list) {
         i.quantidade_minima +
         '"></td><td>' +
         escapeHtml(i.unidade || '') +
-        '</td><td><input type="number" step="0.0001" min="0" class="qty-input" data-preco="' +
-        i.ingrediente_id +
-        '" value="' +
-        (i.preco_unitario != null ? i.preco_unitario : 0) +
-        '"></td><td>' +
-        pendCell +
         '</td><td><button type="button" class="btn btn-primary btn-sm" data-save="' +
         i.ingrediente_id +
         '">Guardar</button></td><td><button type="button" class="btn btn-secondary btn-sm" data-ped="' +
@@ -244,16 +165,13 @@ function renderIng(list) {
       const row = btn.closest('tr');
       const atual = parseFloat(row.querySelector('[data-atual="' + id + '"]').value);
       const min = parseFloat(row.querySelector('[data-min="' + id + '"]').value);
-      const precoEl = row.querySelector('[data-preco="' + id + '"]');
-      const preco_unitario = precoEl ? parseFloat(precoEl.value) : 0;
       const ing = ingredientes.find((x) => String(x.ingrediente_id) === String(id));
       try {
         await API.updateIngrediente(id, {
           nome: ing.nome,
           quantidade_atual: atual,
           quantidade_minima: min,
-          unidade: ing.unidade,
-          preco_unitario: Number.isNaN(preco_unitario) ? 0 : preco_unitario
+          unidade: ing.unidade
         });
         showToast('Stock actualizado', 'success');
         load();
@@ -313,17 +231,10 @@ function renderPed(list) {
   const tb = document.querySelector('#tblPed tbody');
   tb.innerHTML = list
     .map((p) => {
-      const est = estimativaPedido(p);
-      const estCell =
-        est != null && est > 0
-          ? '<span class="pendente-est" title="Qtd × preço de catálogo">' + fmtEuro(est) + '</span>'
-          : '—';
       const totalCell =
-        p.estado === 'recebido' && p.valor_total != null
+        p.estado === 'recebido' && p.valor_total != null && parseFloat(p.valor_total) > 0
           ? fmtEuro(p.valor_total)
-          : p.estado === 'recebido' && p.preco_unitario_compra != null
-            ? fmtEuro(parseFloat(p.quantidade) * parseFloat(p.preco_unitario_compra))
-            : '—';
+          : '—';
       return (
         '<tr><td>' +
         p.pedido_id +
@@ -335,8 +246,6 @@ function renderPed(list) {
         escapeHtml(p.email_fornecedor || '—') +
         '</td><td>' +
         escapeHtml(p.estado) +
-        '</td><td>' +
-        estCell +
         '</td><td>' +
         totalCell +
         '</td><td>' +
@@ -358,23 +267,13 @@ function renderPed(list) {
     b.addEventListener('click', () => {
       const pid = b.getAttribute('data-rec');
       const ped = list.find((x) => String(x.pedido_id) === String(pid));
-      recPedidoActual = ped || null;
       resetRecModal();
       document.getElementById('recPedId').value = pid;
       document.getElementById('recPedInfo').textContent = ped
         ? ped.ingrediente_nome + ' — ' + ped.quantidade + ' ' + (ped.unidade || '')
         : '';
-      const cat = ped ? precoIngrediente(ped.ingrediente_id) : 0;
-      const sugerido =
-        ped && ped.preco_unitario_compra != null
-          ? ped.preco_unitario_compra
-          : cat > 0
-            ? cat
-            : '';
-      document.getElementById('recPrecoUnit').value = sugerido;
       document.getElementById('recValorTotal').value = '';
       document.getElementById('recFatura').value = '';
-      updateRecEstimativa();
       document.getElementById('recModal').classList.add('active');
     })
   );
@@ -394,20 +293,17 @@ function renderPed(list) {
 
 async function saveRec() {
   const id = document.getElementById('recPedId').value;
-  const puc = parseFloat(document.getElementById('recPrecoUnit').value);
-  const vtRaw = document.getElementById('recValorTotal').value;
-  const vt = vtRaw !== '' ? parseFloat(vtRaw) : null;
+  const vt = parseFloat(document.getElementById('recValorTotal').value);
   const num_fatura = document.getElementById('recFatura').value.trim();
-  if (!(puc >= 0) || Number.isNaN(puc)) {
-    showToast('Indique o preço unitário pago', 'warning');
+  if (Number.isNaN(vt) || vt <= 0) {
+    showToast('Indique o valor total pago (€)', 'warning');
     return;
   }
-  const payload = { estado: 'recebido', preco_unitario_compra: puc };
-  if (vt != null && vt > 0) payload.valor_total = vt;
+  const payload = { estado: 'recebido', valor_total: vt };
   if (num_fatura) payload.num_fatura = num_fatura;
   try {
     await API.updatePedidoIngrediente(id, payload);
-    showToast('Pedido recebido — stock e preço actualizados', 'success');
+    showToast('Pedido recebido — stock e despesa registados', 'success');
     document.querySelector('#recModal .modal-actions').style.display = 'none';
     document.getElementById('recLucroWrap').style.display = 'block';
     await load();

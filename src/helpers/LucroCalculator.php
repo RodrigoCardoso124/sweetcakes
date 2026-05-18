@@ -476,8 +476,9 @@ class LucroCalculator
     /**
      * Compras recebidas (fornecedor) + despesas manuais no período.
      */
-    public static function listarMovimentosDespesa(PDO $db, string $de, string $ate): array
+    public static function listarMovimentosDespesa(PDO $db, string $de, string $ate, int $limit = 100): array
     {
+        $limit = max(1, min(500, $limit));
         $out = [];
         if (self::tableExists($db, 'pedidos_ingrediente') && self::columnExists($db, 'pedidos_ingrediente', 'valor_total')) {
             $sql = "SELECT p.pedido_id AS id, p.data_recebido AS data_ref, p.valor_total AS valor,
@@ -503,6 +504,8 @@ class LucroCalculator
                     'descricao' => 'Pedido #' . $r['id'] . ' — ' . ($r['descricao'] ?? 'Material'),
                     'valor' => round((float) $r['valor'], 2),
                     'detalhe' => !empty($r['extra']) ? 'Fatura: ' . $r['extra'] : '',
+                    'despesa_id' => null,
+                    'pedido_id' => (int) $r['id'],
                 ];
             }
         }
@@ -519,13 +522,15 @@ class LucroCalculator
                     'descricao' => $r['descricao'],
                     'valor' => round((float) $r['valor'], 2),
                     'detalhe' => 'Despesa #' . $r['despesa_id'],
+                    'despesa_id' => (int) $r['despesa_id'],
+                    'pedido_id' => null,
                 ];
             }
         }
         usort($out, static function ($a, $b) {
             return strcmp((string) $b['data'], (string) $a['data']);
         });
-        return array_slice($out, 0, 100);
+        return array_slice($out, 0, $limit);
     }
 
     private static function tableExists(PDO $db, string $table): bool

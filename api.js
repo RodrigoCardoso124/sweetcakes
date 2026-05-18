@@ -404,6 +404,10 @@ const API = {
         return apiRequest(`financas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}&view=caixa`);
     },
 
+    async getFinancasMovimentos(de, ate) {
+        return apiRequest(`financas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}&view=movimentos`);
+    },
+
     async recalcularCustosProdutos() {
         return apiRequest('financas/recalcular-custos');
     },

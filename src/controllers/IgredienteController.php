@@ -1,8 +1,6 @@
 <?php
 include_once __DIR__ . "/../models/Ingredientes.php";
 require_once __DIR__ . '/../helpers/stock_alert_mail.php';
-require_once __DIR__ . '/../helpers/LucroCalculator.php';
-
 class IgredienteController {
     private $db;
     private $ingrediente;
@@ -47,13 +45,9 @@ class IgredienteController {
         $this->ingrediente->quantidade_atual = $data['quantidade_atual'];
         $this->ingrediente->unidade = $data['unidade'];
         $this->ingrediente->quantidade_minima = $data['quantidade_minima'];
-        $this->ingrediente->preco_unitario = isset($data['preco_unitario']) ? (float) $data['preco_unitario'] : 0;
 
         if ($this->ingrediente->create()) {
             $newId = $this->ingrediente->lastInsertId();
-            if ($this->ingrediente->preco_unitario > 0) {
-                LucroCalculator::registarPrecoIngrediente($this->db, $newId, (float) $this->ingrediente->preco_unitario);
-            }
             $this->ingrediente->ingrediente_id = $newId;
             $row = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
             if ($row && sc_stock_is_low((float) ($row['quantidade_atual'] ?? 0), (float) ($row['quantidade_minima'] ?? 0))) {
@@ -89,22 +83,9 @@ class IgredienteController {
         $this->ingrediente->quantidade_atual = $data['quantidade_atual'] ?? null;
         $this->ingrediente->unidade = $data['unidade'] ?? null;
         $this->ingrediente->quantidade_minima = $data['quantidade_minima'] ?? null;
-        if (array_key_exists('preco_unitario', $data)) {
-            $this->ingrediente->preco_unitario = (float) $data['preco_unitario'];
-        } else {
-            $this->ingrediente->preco_unitario = null;
-        }
 
         if ($this->ingrediente->update()) {
             $this->ingrediente->ingrediente_id = $id;
-            if ($this->ingrediente->preco_unitario !== null && $this->ingrediente->preco_unitario >= 0) {
-                $precoNovo = (float) $this->ingrediente->preco_unitario;
-                $precoAnt = (float) ($before['preco_unitario'] ?? 0);
-                if (abs($precoNovo - $precoAnt) > 0.0001) {
-                    LucroCalculator::registarPrecoIngrediente($this->db, (int) $id, $precoNovo, null, null, 'Actualização manual');
-                    LucroCalculator::recalcularTodosCustosProdutos($this->db);
-                }
-            }
             $after = $this->ingrediente->getById()->fetch(PDO::FETCH_ASSOC);
             if ($after && sc_ingredient_entered_low_state($before, $after)) {
                 sc_stock_mail_notify_admins_ingredient_low(

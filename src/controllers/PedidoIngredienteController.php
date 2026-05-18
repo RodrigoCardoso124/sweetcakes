@@ -131,24 +131,18 @@ class PedidoIngredienteController
                 $qtd = (float) $row['quantidade'];
                 $this->ingrediente->adjustQuantidade($iid, $qtd);
 
-                $puc = isset($data['preco_unitario_compra']) ? (float) $data['preco_unitario_compra'] : null;
                 $vt = isset($data['valor_total']) ? (float) $data['valor_total'] : null;
-                if ($puc === null && $vt !== null && $vt > 0 && $qtd > 0) {
-                    $puc = $vt / $qtd;
-                }
-                if ($puc === null || $puc < 0) {
+                if ($vt === null || $vt <= 0) {
                     $this->db->rollBack();
                     http_response_code(400);
                     echo json_encode([
-                        'message' => 'Ao marcar como recebido, indique preco_unitario_compra ou valor_total da compra.',
+                        'message' => 'Ao marcar como recebido, indique o valor_total pago (€).',
                     ]);
                     return;
                 }
                 $nf = isset($data['num_fatura']) ? trim((string) $data['num_fatura']) : null;
                 $dr = isset($data['data_recebido']) ? LucroCalculator::parseData($data['data_recebido'], date('Y-m-d')) : date('Y-m-d');
-                $this->pedido->marcarRecebido((int) $id, $puc, $vt, $nf, $dr);
-                LucroCalculator::registarPrecoIngrediente($this->db, $iid, $puc, $dr, (int) $id, $nf ? 'Pedido #' . $id . ' ' . $nf : 'Pedido #' . $id);
-                LucroCalculator::recalcularTodosCustosProdutos($this->db);
+                $this->pedido->marcarRecebido((int) $id, $vt, $nf, $dr);
             } else {
                 $this->pedido->setEstado((int) $id, $estado);
             }
