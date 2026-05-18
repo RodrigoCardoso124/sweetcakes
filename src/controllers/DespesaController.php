@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../models/Despesa.php';
 require_once __DIR__ . '/../helpers/LucroCalculator.php';
+require_once __DIR__ . '/../helpers/IvaHelper.php';
 
 
 
@@ -213,6 +214,20 @@ class DespesaController
 
         }
 
+        $taxa = max(0, min(100, (float) ($data['taxa_iva_pct'] ?? IvaHelper::TAXA_PADRAO)));
+        $modo = trim((string) ($data['modo_valor'] ?? 'com_iva'));
+        if ($modo === 'sem_iva' || $modo === 'base') {
+            $split = IvaHelper::linhaFromPrecoSemIva(1, $valor, $taxa);
+            $base = $split['base_linha'];
+            $iva = $split['iva_linha'];
+            $totalComIva = $split['total_linha'];
+        } else {
+            $split = IvaHelper::splitTotalComIva($valor, $taxa);
+            $base = $split['base'];
+            $iva = $split['iva'];
+            $totalComIva = $split['total'];
+        }
+
         return [
 
             'error' => null,
@@ -223,7 +238,13 @@ class DespesaController
 
                 'descricao' => $desc,
 
-                'valor' => round($valor, 2),
+                'valor' => round($totalComIva, 2),
+
+                'taxa_iva_pct' => $taxa,
+
+                'total_base' => $base,
+
+                'total_iva' => $iva,
 
                 'data_despesa' => $dataDesp,
 

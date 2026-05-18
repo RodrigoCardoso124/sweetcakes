@@ -334,29 +334,7 @@ class LucroCalculator
 
         $receitaEncomendas = (float) ($stmt->fetch(PDO::FETCH_ASSOC)['s'] ?? 0);
 
-
-
-        $temDataVenda = self::columnExists($db, 'vendas', 'data_venda');
-
-        if ($temDataVenda) {
-
-            $stmtV = $db->prepare(
-
-                'SELECT COALESCE(SUM(total), 0) AS s FROM vendas WHERE DATE(data_venda) BETWEEN ? AND ?'
-
-            );
-
-            $stmtV->execute([$de, $ate]);
-
-        } else {
-
-            $stmtV = $db->query('SELECT COALESCE(SUM(total), 0) AS s FROM vendas');
-
-        }
-
-        $receitaVendas = (float) ($stmtV->fetch(PDO::FETCH_ASSOC)['s'] ?? 0);
-
-        $receitaTotal = $receitaEncomendas + $receitaVendas;
+        $receitaTotal = $receitaEncomendas;
 
 
 
@@ -432,7 +410,6 @@ class LucroCalculator
             'periodo' => ['de' => $de, 'ate' => $ate],
             'ganhos' => [
                 'encomendas_entregues' => round($receitaEncomendas, 2),
-                'vendas_balcao' => round($receitaVendas, 2),
                 'total' => round($receitaTotal, 2),
             ],
             'despesas' => [
@@ -443,7 +420,6 @@ class LucroCalculator
             'lucro_total' => round($lucroTotal, 2),
             'receita' => [
                 'encomendas_entregues' => round($receitaEncomendas, 2),
-                'vendas_balcao' => round($receitaVendas, 2),
                 'total' => round($receitaTotal, 2),
             ],
             'custos' => [
@@ -458,7 +434,7 @@ class LucroCalculator
             ],
             'pedidos_fornecedor' => [
                 'pendentes' => $pedidosPendentes,
-                'ajuda' => 'Os pedidos ao fornecedor só entram nas despesas quando marcas «Recebido» e indicas o preço pago (em Materiais).',
+                'ajuda' => 'Os pedidos ao fornecedor só entram nas despesas quando marcas «Recebido» com o valor total pago (em Materiais).',
             ],
             'movimentos_despesa' => $movimentos,
             'margem_vendido' => $margem,
@@ -467,7 +443,7 @@ class LucroCalculator
                 'encomendas_contam_estado' => $estados,
                 'linhas_sem_custo' => $margem['linhas_sem_custo'],
                 'linhas_sem_preco' => $margem['linhas_sem_preco'],
-                'formula_lucro' => 'Lucro total = Ganhos (vendas) − Despesas (compras recebidas + outras despesas)',
+                'formula_lucro' => 'Lucro total = Ganhos (encomendas entregues) − Despesas (compras recebidas + outras despesas)',
             ],
         ];
 
@@ -674,54 +650,6 @@ class LucroCalculator
             }
 
             $custoLinhas += $custoU * $q;
-
-        }
-
-
-
-        // Vendas balcão
-
-        if (self::tableExists($db, 'produtos_vendidos')) {
-
-            $sqlV = 'SELECT pv.quantidade, pv.preco_unitario, pv.produto_id
-
-                     FROM produtos_vendidos pv
-
-                     INNER JOIN vendas v ON v.venda_id = pv.venda_id';
-
-            $paramsV = [];
-
-            if (self::columnExists($db, 'vendas', 'data_venda')) {
-
-                $sqlV .= ' WHERE DATE(v.data_venda) BETWEEN ? AND ?';
-
-                $paramsV = [$de, $ate];
-
-            }
-
-            $stmtV = $db->prepare($sqlV);
-
-            $stmtV->execute($paramsV);
-
-            foreach ($stmtV->fetchAll(PDO::FETCH_ASSOC) as $pv) {
-
-                $q = max(0, (int) ($pv['quantidade'] ?? 0));
-
-                $receitaLinhas += (float) ($pv['preco_unitario'] ?? 0) * $q;
-
-                $custoU = self::calcularCustoUnitarioProduto($db, (int) $pv['produto_id']);
-
-                if ($custoU === null) {
-
-                    $semCusto++;
-
-                } else {
-
-                    $custoLinhas += $custoU * $q;
-
-                }
-
-            }
 
         }
 

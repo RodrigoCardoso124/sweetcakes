@@ -422,6 +422,86 @@ const API = {
 
     async deleteDespesa(id) {
         return apiRequest(`despesas/${id}`, 'DELETE');
+    },
+
+    async getDespesa(id) {
+        return apiRequest(`despesas/${id}`);
+    },
+
+    async updateDespesa(id, data) {
+        return apiRequest(`despesas/${id}`, 'PUT', data);
+    },
+
+    async getFornecedores() {
+        return apiRequest('fornecedores');
+    },
+
+    async getFornecedor(id) {
+        return apiRequest(`fornecedores/${id}`);
+    },
+
+    async createFornecedor(data) {
+        return apiRequest('fornecedores', 'POST', data);
+    },
+
+    async updateFornecedor(id, data) {
+        return apiRequest(`fornecedores/${id}`, 'PUT', data);
+    },
+
+    async deleteFornecedor(id) {
+        return apiRequest(`fornecedores/${id}`, 'DELETE');
+    },
+
+    async getFaturacaoEmitidas(de, ate, estado) {
+        let q = `faturacao?view=emitidas&de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`;
+        if (estado) q += `&estado=${encodeURIComponent(estado)}`;
+        return apiRequest(q);
+    },
+
+    async getFaturacaoRecebidas(de, ate) {
+        return apiRequest(
+            `faturacao?view=recebidas&de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`
+        );
+    },
+
+    async getFaturacaoResumoIva(de, ate) {
+        return apiRequest(
+            `faturacao?view=resumo-iva&de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}`
+        );
+    },
+
+    async getFaturacaoConfig() {
+        return apiRequest('faturacao?view=config');
+    },
+
+    async saveFaturacaoConfig(data) {
+        return apiRequest('faturacao', 'POST', data);
+    },
+
+    async getFatura(id) {
+        return apiRequest(`faturacao/${id}`);
+    },
+
+    async getFaturacaoPreview(encomendaId, taxaIva) {
+        let q = `faturacao?view=preview&encomenda_id=${encodeURIComponent(encomendaId)}`;
+        if (taxaIva != null) q += `&taxa_iva_pct=${encodeURIComponent(taxaIva)}`;
+        return apiRequest(q);
+    },
+
+    async emitirFatura(data) {
+        return apiRequest('faturacao', 'POST', Object.assign({ action: 'emitir' }, data));
+    },
+
+    async anularFatura(id) {
+        return apiRequest(`faturacao/${id}`, 'PUT', { action: 'anular' });
+    },
+
+    async createFaturaRecebida(data) {
+        return apiRequest('faturacao', 'POST', Object.assign({ action: 'recebida' }, data));
+    },
+
+    async deleteFaturaRecebida(id) {
+        return apiRequest(`faturacao/${id}`, 'DELETE');
     }
 };
 

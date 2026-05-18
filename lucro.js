@@ -1,4 +1,5 @@
 /* global API, initAdminShell, showToast */
+/** @deprecated Use estatisticas.html (#sec-lucro e #sec-produtos-margem). lucro.html redireciona. */
 
 let produtosLucro = [];
 

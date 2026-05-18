@@ -12,7 +12,11 @@ class Fornecedor {
     }
 
     public function getAll() {
-        $query = "SELECT * FROM {$this->table}";
+        $query = "SELECT f.fornecedor_id, f.empresa, f.pessoas_pessoa_id AS pessoa_id,
+                         p.nome AS contacto_nome, p.email, p.telemovel
+                  FROM {$this->table} f
+                  LEFT JOIN pessoas p ON p.pessoa_id = f.pessoas_pessoa_id
+                  ORDER BY f.empresa ASC";
         $stmt  = $this->conn->prepare($query);
         $stmt->execute();
         return $stmt;

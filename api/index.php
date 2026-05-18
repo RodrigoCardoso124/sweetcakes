@@ -3,20 +3,6 @@
  * API principal Sweet Cakes.
  * Raiz → admin (como no projeto original no InfinityFree). Catálogo público: /landing.html
  */
-function sc_debug_log(string $hypothesisId, string $location, string $message, array $data = []): void
-{
-    $line = [
-        'sessionId' => '6bdd51',
-        'runId' => 'pre-fix',
-        'hypothesisId' => $hypothesisId,
-        'location' => $location,
-        'message' => $message,
-        'data' => $data,
-        'timestamp' => (int) round(microtime(true) * 1000),
-    ];
-    @file_put_contents(__DIR__ . '/debug-6bdd51.log', json_encode($line, JSON_UNESCAPED_UNICODE) . PHP_EOL, FILE_APPEND);
-}
-
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $requestPath = $requestPath !== null ? rtrim($requestPath, '/') : '';
 $hasRouteParam = isset($_GET['route']) && trim((string) $_GET['route']) !== '';
@@ -38,13 +24,6 @@ ob_start();
 
 $appConfig = require __DIR__ . '/../src/config/app_config.php';
 define('APP_DEBUG', !empty($appConfig['app_debug']));
-// #region agent log
-sc_debug_log('H1', 'index.php:40', 'Configuração app carregada', [
-    'app_env' => $appConfig['app_env'] ?? null,
-    'app_debug' => !empty($appConfig['app_debug']),
-    'has_local_app_config' => file_exists(__DIR__ . '/../src/config/app_config.local.php'),
-]);
-// #endregion
 
 require_once __DIR__ . '/../src/config/database.php';
 require_once __DIR__ . '/../src/helpers/Auth.php';
@@ -92,15 +71,6 @@ if (!defined('SC_DEBUG_DB_NAME')) {
 if (!defined('SC_DEBUG_DB_USER')) {
     define('SC_DEBUG_DB_USER', (string) ($databaseConfig['username'] ?? ''));
 }
-// #region agent log
-sc_debug_log('H2', 'index.php:74', 'Configuração BD carregada', [
-    'db_host' => $databaseConfig['host'] ?? null,
-    'db_name' => $databaseConfig['db_name'] ?? null,
-    'db_user' => $databaseConfig['username'] ?? null,
-    'has_local_db_config' => file_exists(__DIR__ . '/../src/config/database.local.php'),
-]);
-// #endregion
-
 $controllerPath = __DIR__ . '/../src/controllers/';
 $modelPath = __DIR__ . '/../src/models/';
 
@@ -181,6 +151,7 @@ $routes = [
     'pedidos_ingrediente' => 'PedidoIngredienteController',
     'financas' => 'FinancasController',
     'despesas' => 'DespesaController',
+    'faturacao' => 'FaturacaoController',
 ];
 
 /**
@@ -223,7 +194,7 @@ function sc_is_public_api_route(?string $resource, string $method): bool
  */
 function sc_route_requires_admin(?string $resource, string $method): bool
 {
-    $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores', 'pedidos_ingrediente', 'financas', 'despesas'];
+    $adminOnly = ['pessoas', 'funcionarios', 'ingredientes', 'produto_ingredientes', 'vendas', 'produtos_vendidos', 'fornecedores', 'utilizadores', 'pedidos_ingrediente', 'financas', 'despesas', 'faturacao'];
     if ($resource === 'pessoas' && $method === 'POST') {
         return false;
     }

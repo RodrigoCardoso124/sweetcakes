@@ -71,6 +71,21 @@ Você pode alterar o estado de uma encomenda para:
 ✅ Auto-refresh a cada 30 segundos
 ✅ Design moderno e intuitivo
 
+## 💰 Finanças e lucro (admin)
+
+1. Executar migrações no servidor (uma vez):
+   - `/api/migrate_007_encomenda_detalhes.php` — preços por linha na encomenda
+   - `/api/migrate_008_financas.php` — despesas, custos e lucro
+   - `/api/migrate_009_faturacao.php` — faturação e IVA
+2. **Estatísticas** — secção Lucro (ganhos de encomendas entregues − despesas) e margem por produto
+3. **Despesas** — registo manual; compras ao fornecedor entram ao marcar pedido como Recebido em **Materiais**
+4. **Fornecedores** — cadastro de empresas fornecedoras
+5. **Faturação** (`faturacao.html`) — emitir faturas (encomendas entregues), registar documentos de fornecedor, resumo de IVA, export CSV para contabilidade/AT (informativo; não substitui software certificado).
+
+### Migração faturação
+
+`/api/migrate_009_faturacao.php` — tabelas de faturas, IVA nas despesas, NIF nos clientes, dados da empresa.
+
 ## 🔧 Configuração
 
 O sistema está configurado para usar a API em:

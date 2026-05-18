@@ -38,28 +38,51 @@ class FornecedorController {
     // ----------------------------------------------------------
  
     public function store($data) {
-        if (!isset($data['empresa'], $data['pessoa_id'])) {
+        $empresa = trim((string) ($data['empresa'] ?? ''));
+        if ($empresa === '') {
             http_response_code(400);
-            echo json_encode(["message" => "empresa e pessoa_id são obrigatórios"]);
+            echo json_encode(["message" => "empresa é obrigatória"]);
             return;
         }
 
-        // Validar pessoa
-        $this->pessoa->pessoa_id = $data['pessoa_id'];
-        $stmt = $this->pessoa->getById();
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
-            http_response_code(400);
-            echo json_encode(["message" => "Pessoa associada não existe"]);
-            return;
+        $pessoaId = isset($data['pessoa_id']) ? (int) $data['pessoa_id'] : 0;
+        if ($pessoaId <= 0) {
+            $nome = trim((string) ($data['nome_contato'] ?? $empresa));
+            if ($nome === '') {
+                http_response_code(400);
+                echo json_encode(["message" => "nome_contato ou pessoa_id é obrigatório"]);
+                return;
+            }
+            $this->pessoa->nome = $nome;
+            $this->pessoa->email = trim((string) ($data['email'] ?? '')) ?: null;
+            $this->pessoa->telemovel = trim((string) ($data['telemovel'] ?? '')) ?: null;
+            $this->pessoa->morada = trim((string) ($data['morada'] ?? '')) ?: null;
+            if (!$this->pessoa->create()) {
+                http_response_code(500);
+                echo json_encode(["message" => "Erro ao criar contacto"]);
+                return;
+            }
+            $pessoaId = (int) $this->db->lastInsertId();
+        } else {
+            $this->pessoa->pessoa_id = $pessoaId;
+            $stmt = $this->pessoa->getById();
+            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+                http_response_code(400);
+                echo json_encode(["message" => "Pessoa associada não existe"]);
+                return;
+            }
         }
 
-        // Criar fornecedor
-        $this->fornecedor->empresa = $data['empresa'];
-        $this->fornecedor->pessoas_pessoa_id = $data['pessoa_id'];
+        $this->fornecedor->empresa = $empresa;
+        $this->fornecedor->pessoas_pessoa_id = $pessoaId;
 
         if ($this->fornecedor->create()) {
             http_response_code(201);
-            echo json_encode(["message" => "Fornecedor criado com sucesso"]);
+            echo json_encode([
+                "message" => "Fornecedor criado com sucesso",
+                "fornecedor_id" => (int) $this->db->lastInsertId(),
+                "pessoa_id" => $pessoaId,
+            ], JSON_UNESCAPED_UNICODE);
         } else {
             http_response_code(500);
             echo json_encode(["message" => "Erro ao criar fornecedor"]);
@@ -71,29 +94,45 @@ class FornecedorController {
     public function update($id, $data) {
         $this->fornecedor->fornecedor_id = $id;
 
-        // Verificar se fornecedor existe
         $stmt = $this->fornecedor->getById();
-        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$existing) {
             http_response_code(404);
             echo json_encode(["message" => "Fornecedor não encontrado"]);
             return;
         }
 
-        // Validar pessoa, se for enviada
         if (isset($data['pessoa_id'])) {
-            $this->pessoa->pessoa_id = $data['pessoa_id'];
-            $stmt = $this->pessoa->getById();
-            if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            $this->pessoa->pessoa_id = (int) $data['pessoa_id'];
+            $stmtP = $this->pessoa->getById();
+            if (!$stmtP->fetch(PDO::FETCH_ASSOC)) {
                 http_response_code(400);
                 echo json_encode(["message" => "Pessoa associada não existe"]);
                 return;
             }
         }
 
-        $this->fornecedor->empresa = $data['empresa'] ?? null;
-        $this->fornecedor->pessoas_pessoa_id = $data['pessoa_id'] ?? null;
+        $this->fornecedor->empresa = isset($data['empresa'])
+            ? trim((string) $data['empresa'])
+            : (string) $existing['empresa'];
+        $this->fornecedor->pessoas_pessoa_id = isset($data['pessoa_id'])
+            ? (int) $data['pessoa_id']
+            : (int) $existing['pessoas_pessoa_id'];
 
         if ($this->fornecedor->update()) {
+            $pid = (int) $this->fornecedor->pessoas_pessoa_id;
+            if ($pid > 0 && (isset($data['nome_contato']) || isset($data['email']) || isset($data['telemovel']))) {
+                $this->pessoa->pessoa_id = $pid;
+                $stmtP = $this->pessoa->getById();
+                $rowP = $stmtP->fetch(PDO::FETCH_ASSOC);
+                if ($rowP) {
+                    $this->pessoa->nome = isset($data['nome_contato']) ? trim((string) $data['nome_contato']) : $rowP['nome'];
+                    $this->pessoa->email = isset($data['email']) ? (trim((string) $data['email']) ?: null) : $rowP['email'];
+                    $this->pessoa->telemovel = isset($data['telemovel']) ? (trim((string) $data['telemovel']) ?: null) : $rowP['telemovel'];
+                    $this->pessoa->morada = $rowP['morada'] ?? null;
+                    $this->pessoa->update();
+                }
+            }
             echo json_encode(["message" => "Fornecedor atualizado com sucesso"]);
         } else {
             http_response_code(500);

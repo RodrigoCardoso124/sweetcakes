@@ -118,6 +118,20 @@
                             <label>Morada:</label>
                             <span id="clientAddress"></span>
                         </div>
+                        <div class="detail-item" data-admin-only="true">
+                            <label>NIF:</label>
+                            <span id="clientNif">—</span>
+                        
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-card" id="faturaCard" data-admin-only="true" style="display:none;">
+                    <h3>Faturação</h3>
+                    <p id="faturaStatusText" class="muted">—</p>
+                    <div class="header-actions" style="margin-top:12px;">
+                        <button type="button" id="emitirFaturaBtn" class="btn btn-primary" style="display:none;">Emitir fatura</button>
+                        <a href="#" id="verFaturaLink" class="btn btn-secondary" style="display:none;">Ver fatura</a>
                     </div>
                 </div>
 
@@ -125,6 +139,7 @@
                 <div class="detail-card">
                     <h3>Produtos da Encomenda</h3>
                     <div id="productsList" class="products-list"></div>
+                    <div id="orderLinesTotals" class="order-lines-totals" style="display:none;"></div>
                 </div>
 
                 <!-- Actions -->

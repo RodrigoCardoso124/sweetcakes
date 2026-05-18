@@ -53,6 +53,7 @@ class PessoaController
         $this->pessoa->email = $data['email'];
         $this->pessoa->telemovel = $data['telemovel'];
         $this->pessoa->morada = $data['morada'];
+        $this->pessoa->nif = isset($data['nif']) ? trim((string) $data['nif']) : null;
 
         if ($this->pessoa->create()) {
             $novoId = (int) $this->db->lastInsertId();
@@ -103,6 +104,9 @@ class PessoaController
         $this->pessoa->email = $data['email'] ?? null;
         $this->pessoa->telemovel = $data['telemovel'] ?? null;
         $this->pessoa->morada = $data['morada'] ?? null;
+        if (array_key_exists('nif', $data)) {
+            $this->pessoa->nif = trim((string) $data['nif']) ?: null;
+        }
 
         if ($this->pessoa->update()) {
             echo json_encode(['message' => 'Pessoa atualizada com sucesso']);

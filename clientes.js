@@ -144,6 +144,8 @@ function openClienteModal(cliente = null) {
         document.getElementById('email').value = cliente.email || '';
         document.getElementById('telemovel').value = cliente.telemovel || '';
         document.getElementById('morada').value = cliente.morada || '';
+        const nifEl = document.getElementById('nif');
+        if (nifEl) nifEl.value = cliente.nif || '';
     } else {
         title.textContent = 'Novo Cliente';
     }
@@ -158,7 +160,8 @@ async function saveCliente(e) {
         nome: document.getElementById('nome').value,
         email: document.getElementById('email').value,
         telemovel: document.getElementById('telemovel').value,
-        morada: document.getElementById('morada').value
+        morada: document.getElementById('morada').value,
+        nif: (document.getElementById('nif') && document.getElementById('nif').value.trim()) || null
     };
     
     const clienteId = document.getElementById('clienteId').value;

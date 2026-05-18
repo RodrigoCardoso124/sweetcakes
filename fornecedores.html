@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="shortcut icon" href="/favicon.ico">
-    <title>Receitas - Sweet Cakes</title>
+    <title>Fornecedores - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body data-page-scope="admin">
+    
     <div class="admin-container">
         <aside class="sidebar" id="admin-sidebar">
             <div class="sidebar-header">
@@ -21,11 +22,11 @@
                 <a href="produtos.html" class="nav-item"><span class="icon">🍰</span><span>Produtos</span></a>
                 <a href="promocoes.html" class="nav-item" data-admin-only="true"><span class="icon">🎁</span><span>Promoções</span></a>
                 <a href="funcionarios.html" class="nav-item" data-admin-only="true"><span class="icon">👔</span><span>Funcionários</span></a>
-                <a href="estatisticas.html" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas</span></a>
+                <a href="estatisticas.html#sec-lucro" class="nav-item" data-admin-only="true"><span class="icon">📊</span><span>Estatísticas & Lucro</span></a>
                 <a href="despesas.html" class="nav-item" data-admin-only="true"><span class="icon">💸</span><span>Despesas</span></a>
-                <a href="fornecedores.html" class="nav-item" data-admin-only="true"><span class="icon">🏢</span><span>Fornecedores</span></a>
+                <a href="fornecedores.html" class="nav-item active" data-admin-only="true"><span class="icon">🏢</span><span>Fornecedores</span></a>
                 <a href="producao.html" class="nav-item"><span class="icon">🏭</span><span>Produção</span></a>
-                <a href="receitas.html" class="nav-item active" data-admin-only="true"><span class="icon">📋</span><span>Receitas</span></a>
+                <a href="receitas.html" class="nav-item" data-admin-only="true"><span class="icon">📋</span><span>Receitas</span></a>
                 <a href="materiais-stock.html" class="nav-item" data-admin-only="true"><span class="icon">🧂</span><span>Materiais</span></a>
             </nav>
             <div class="sidebar-footer">
@@ -35,26 +36,32 @@
 
         <main class="main-content">
             <header class="header">
+                
+                
                 <div class="header-left">
                     <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
-                    <h2>Receitas de produção</h2>
+                    <h2>Fornecedores</h2>
                 </div>
                 <div class="header-actions">
-                    <button id="addBtn" class="btn btn-primary">+ Nova receita</button>
+                    <button type="button" id="addFornecedorBtn" class="btn btn-primary">+ Novo fornecedor</button>
                     <button id="refreshBtn" class="btn btn-secondary">🔄 Atualizar</button>
                 </div>
             </header>
 
-            <p class="page-intro">Define quantas unidades de produto cada execução gera (ex.: 9 pudins) e quanto de cada ingrediente consome por execução. Os funcionários executam na página «Produção».</p>
+            <p class="page-intro">
+                Empresas que fornecem materiais. Os pedidos em <a href="materiais-stock.html">Materiais</a> entram nas despesas ao marcar como
+                <strong>Recebido</strong> com o valor total pago.
+            </p>
 
             <div class="table-wrap">
-                <table class="orders-table" id="tbl">
+                <table class="orders-table" id="tblFornecedores">
                     <thead>
                         <tr>
-                            <th>Nome</th>
-                            <th>Produto</th>
-                            <th>Rendimento</th>
-                            <th>Activa</th>
+                            <th>ID</th>
+                            <th>Empresa</th>
+                            <th>Contacto</th>
+                            <th>Email</th>
+                            <th>Telemóvel</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -64,39 +71,34 @@
         </main>
     </div>
 
-    <div id="modal" class="modal">
-        <div class="modal-content" style="max-width:640px;">
-            <span class="close" id="modalClose">&times;</span>
-            <h3 id="modalTitle">Receita</h3>
-            <form id="form">
-                <input type="hidden" id="receitaId">
+    <div id="fornecedorModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="fornecedorModalTitle">Novo fornecedor</h3>
+            <form id="fornecedorForm">
+                <input type="hidden" id="fornecedorId">
                 <div class="form-group">
-                    <label>Nome *</label>
-                    <input type="text" id="nome" required maxlength="150">
+                    <label for="fornEmpresa">Empresa *</label>
+                    <input type="text" id="fornEmpresa" required maxlength="120">
                 </div>
                 <div class="form-group">
-                    <label>Produto final *</label>
-                    <select id="produtoId" required></select>
+                    <label for="fornContacto">Nome do contacto</label>
+                    <input type="text" id="fornContacto" maxlength="120">
                 </div>
                 <div class="form-row-2">
                     <div class="form-group">
-                        <label>Rendimento (unidades / execução) *</label>
-                        <input type="number" id="rendimento" min="1" value="1" required>
+                        <label for="fornEmail">Email</label>
+                        <input type="email" id="fornEmail" maxlength="120">
                     </div>
                     <div class="form-group">
-                        <label><input type="checkbox" id="ativo" checked> Receita activa</label>
+                        <label for="fornTelemovel">Telemóvel</label>
+                        <input type="text" id="fornTelemovel" maxlength="30">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Notas</label>
-                    <textarea id="notas" rows="2"></textarea>
-                </div>
-                <h4>Ingredientes por execução</h4>
-                <div id="linhas"></div>
-                <button type="button" class="btn btn-secondary" id="addLinha">+ Ingrediente</button>
-                <div class="modal-actions" style="margin-top:16px;">
+                
+                <div class="form-actions">
+                    <button type="button" id="cancelFornecedorBtn" class="btn btn-secondary">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" id="cancelBtn">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -104,6 +106,6 @@
 
     <script src="api.js"></script>
     <script src="admin-common.js"></script>
-    <script src="receitas.js"></script>
+    <script src="fornecedores.js"></script>
 </body>
 </html>

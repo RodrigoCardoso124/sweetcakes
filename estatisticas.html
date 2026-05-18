@@ -8,7 +8,7 @@
     <title>Estatísticas - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-page-scope="admin">
     <div class="admin-container">
         <!-- Sidebar -->
         <aside class="sidebar" id="admin-sidebar">
@@ -44,6 +44,14 @@
                 <a href="despesas.html" class="nav-item" data-admin-only="true">
                     <span class="icon">💸</span>
                     <span>Despesas</span>
+                </a>
+                <a href="fornecedores.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">🏢</span>
+                    <span>Fornecedores</span>
+                </a>
+                <a href="faturacao.html" class="nav-item" data-admin-only="true">
+                    <span class="icon">🧾</span>
+                    <span>Faturação</span>
                 </a>
                 <a href="producao.html" class="nav-item">
                     <span class="icon">🏭</span>
@@ -88,7 +96,8 @@
                     <div class="stat-icon">💰</div>
                     <div class="stat-info">
                         <h3 id="totalVendas">€0.00</h3>
-                        <p>Total Vendas</p>
+                        <p>Receita (entregues)</p>
+                        <small class="muted" style="font-size:12px;">Igual aos ganhos no lucro</small>
                     </div>
                 </div>
                 <div class="stat-card">
@@ -133,7 +142,40 @@
                     <p class="muted lucro-total-formula" id="lucroTotalFormula">Ganhos − Despesas totais</p>
                 </div>
                 <p id="lucroNotas" class="muted" style="margin:16px 0;"></p>
-                <p style="margin-top:12px;"><a href="despesas.html" class="btn btn-secondary">💸 Ver e gerir despesas</a></p>
+                <p style="margin-top:12px;">
+                    <a href="despesas.html" class="btn btn-secondary">💸 Ver e gerir despesas</a>
+                    <a href="faturacao.html" class="btn btn-secondary" style="margin-left:8px;">🧾 Faturação e IVA</a>
+                </p>
+            </div>
+
+            <div class="detail-card" id="sec-produtos-margem" data-admin-only="true">
+                <h3>Margem por produto (entregues)</h3>
+                <p class="page-intro muted" style="margin-bottom:14px;">
+                    Usa o mesmo período do lucro acima. Custos estimados a partir de receitas e preços de materiais.
+                </p>
+                <motion></motion>
+                <div class="header-actions" style="margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+                    <button type="button" id="prodLucroRecalcBtn" class="btn btn-secondary">Recalcular custos dos produtos</button>
+                    <button type="button" id="prodLucroExportBtn" class="btn btn-secondary">Exportar CSV</button>
+                </div>
+                <div class="table-wrap">
+                    <table class="orders-table" id="tblProdutosLucro">
+                        <thead>
+                            <tr>
+                                <th>Produto</th>
+                                <th>Qtd</th>
+                                <th>Receita</th>
+                                <th>Custo est.</th>
+                                <th>Lucro</th>
+                                <th>Margem</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </motion>
+                </div>
+            </div>
+
             <!-- Encomendas Stats -->
             <div class="detail-card">
                 <h3>Estatísticas de Encomendas</h3>
@@ -218,14 +260,14 @@
                         <small id="topFuncionarioInfo">Sem dados</small>
                     </div>
                     <div class="insight-card">
-                        <h4>🍰 Produto Mais Vendido</h4>
+                        <h4>🍰 Produto Mais Vendido (entregues)</h4>
                         <p id="topProdutoNome">-</p>
                         <small id="topProdutoInfo">Sem dados</small>
                     </div>
                     <div class="insight-card">
                         <h4>🧾 Ticket Médio</h4>
                         <p id="ticketMedioValor">€0.00</p>
-                        <small id="ticketMedioInfo">Total / nº de encomendas</small>
+                        <small id="ticketMedioInfo">Receita entregues / nº entregues</small>
                     </div>
                     <div class="insight-card">
                         <h4>📈 Taxa de Entrega</h4>

@@ -659,6 +659,49 @@ body {
     font-style: italic;
 }
 
+.product-line-prices {
+    text-align: right;
+    min-width: 120px;
+}
+
+.product-line-total {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--primary-color);
+    margin-top: 4px;
+}
+
+.order-lines-totals {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+.order-totals-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 14px;
+}
+
+.order-totals-row--total {
+    font-weight: 700;
+    font-size: 16px;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.order-totals-discount {
+    color: var(--text-warn, #b45309);
+}
+
+.order-totals-warn {
+    margin: 10px 0 0;
+    font-size: 13px;
+}
+
 .product-quantity {
     font-weight: 600;
     color: var(--primary-color);
@@ -1629,5 +1672,76 @@ textarea:focus {
 
 #sec-lucro .section-title {
     margin-top: 8px;
+}
+
+.tabs-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+}
+
+.tabs-nav .tab-btn {
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.tabs-nav .tab-btn.active {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
+.modal--wide .modal-content {
+    max-width: 900px;
+}
+
+.fatura-doc {
+    padding: 8px 4px;
+}
+
+.fatura-header h1 {
+    margin: 0 0 8px;
+    font-size: 1.35rem;
+}
+
+.fatura-anulada {
+    color: var(--danger);
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.fatura-totais {
+    text-align: right;
+    font-size: 1.05rem;
+    margin-top: 16px;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #faturaPrintModal.active,
+    #faturaPrintModal.active * {
+        visibility: visible;
+    }
+    #faturaPrintModal {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    #faturaPrintModal .close,
+    #faturaPrintModal .form-actions {
+        display: none !important;
+    }
 }
 

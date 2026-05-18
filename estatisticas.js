@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadEstatisticas();
     setupEventListeners();
     setupLucro();
+    setupProdutosMargem();
     if (location.hash === '#sec-lucro') {
         setTimeout(function () {
             var el = document.getElementById('sec-lucro');
@@ -20,7 +21,101 @@ function setupEventListeners() {
     document.getElementById('refreshBtn').addEventListener('click', function () {
         loadEstatisticas();
         if (typeof loadLucro === 'function') loadLucro();
+        if (typeof loadProdutosMargem === 'function') loadProdutosMargem();
     });
+}
+
+let produtosMargemCache = [];
+
+function setupProdutosMargem() {
+    var sec = document.getElementById('sec-produtos-margem');
+    if (!sec || typeof API === 'undefined' || !API.getFinancasProdutos) return;
+    document.getElementById('lucroAplicarBtn').addEventListener('click', loadProdutosMargem);
+    document.getElementById('prodLucroRecalcBtn').addEventListener('click', recalcularCustosProdutos);
+    document.getElementById('prodLucroExportBtn').addEventListener('click', exportProdutosMargemCsv);
+    loadProdutosMargem();
+}
+
+async function loadProdutosMargem() {
+    var deEl = document.getElementById('lucroDe');
+    var ateEl = document.getElementById('lucroAte');
+    if (!deEl || !ateEl) return;
+    var tb = document.querySelector('#tblProdutosLucro tbody');
+    if (!tb) return;
+    try {
+        var r = await API.getFinancasProdutos(deEl.value, ateEl.value);
+        produtosMargemCache = r.produtos || [];
+        if (!produtosMargemCache.length) {
+            tb.innerHTML =
+                '<tr><td colspan="6" class="table-empty-msg">Sem vendas no período (encomendas entregues).</td></tr>';
+            return;
+        }
+        tb.innerHTML = produtosMargemCache
+            .map(function (p) {
+                var marg = p.margem_percent != null ? p.margem_percent + '%' : '—';
+                return (
+                    '<tr><td>' +
+                    escapeHtmlStats(p.nome) +
+                    '</td><td>' +
+                    p.quantidade_vendida +
+                    '</td><td>' +
+                    fmtEuro(p.receita) +
+                    '</td><td>' +
+                    fmtEuro(p.custo_estimado) +
+                    '</td><td>' +
+                    fmtEuro(p.lucro_bruto) +
+                    '</td><td>' +
+                    marg +
+                    '</td></tr>'
+                );
+            })
+            .join('');
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Produtos: ' + (e.message || e), 'warning');
+    }
+}
+
+async function recalcularCustosProdutos() {
+    try {
+        await API.recalcularCustosProdutos();
+        if (typeof showToast === 'function') showToast('Custos actualizados', 'success');
+        loadProdutosMargem();
+        loadLucro();
+    } catch (e) {
+        if (typeof showToast === 'function') showToast(e.message, 'warning');
+    }
+}
+
+function exportProdutosMargemCsv() {
+    if (!produtosMargemCache.length) {
+        if (typeof showToast === 'function') showToast('Nada para exportar', 'warning');
+        return;
+    }
+    var header = 'Produto;Qtd;Receita;Custo;Lucro;Margem%\n';
+    var rows = produtosMargemCache
+        .map(function (p) {
+            return [
+                (p.nome || '').replace(/;/g, ','),
+                p.quantidade_vendida,
+                p.receita,
+                p.custo_estimado,
+                p.lucro_bruto,
+                p.margem_percent != null ? p.margem_percent : ''
+            ].join(';');
+        })
+        .join('\n');
+    var blob = new Blob(['\ufeff' + header + rows], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'margem-produtos.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+function escapeHtmlStats(t) {
+    var d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
 }
 
 function fmtEuro(n) {
@@ -120,12 +215,16 @@ async function loadEstatisticas() {
         const funcionarios = ensureArray(funcionariosRes);
         const detalhes = ensureArray(detalhesRes);
 
-        // Calculate statistics
+        const encomendasEntregues = encomendas.filter((e) => e && e.estado === 'entregue');
+        const entregueIds = new Set(
+            encomendasEntregues.map((e) => String(e.encomenda_id))
+        );
+
         let totalVendas = 0;
-        encomendas.forEach((e) => {
-            totalVendas += parseFloat((e && e.total) || 0) || 0;
+        encomendasEntregues.forEach((e) => {
+            totalVendas += parseFloat(e.total || 0) || 0;
         });
-        
+
         // Encomendas by status
         const encomendasByStatus = {
             pendente: encomendas.filter(e => e.estado === 'pendente').length,
@@ -164,40 +263,45 @@ async function loadEstatisticas() {
         const gastoPorCliente = {};
         const vendasPorFuncionario = {};
         const totalPorDia = {};
-        encomendas.forEach(e => {
-            const total = parseFloat((e && e.total) || 0) || 0;
-            const clienteId = String((e && e.cliente_id) || '');
-            const funcionarioId = String((e && e.funcionario_id) || '');
-            const dia = String((e && e.data_criacao) || '').slice(0, 10);
+        encomendasEntregues.forEach((e) => {
+            const total = parseFloat(e.total || 0) || 0;
+            const clienteId = String(e.cliente_id || '');
+            const funcionarioId = String(e.funcionario_id || '');
+            const dia = String((e.data_criacao || e.criado_em || '')).slice(0, 10);
             if (clienteId) gastoPorCliente[clienteId] = (gastoPorCliente[clienteId] || 0) + total;
             if (funcionarioId) vendasPorFuncionario[funcionarioId] = (vendasPorFuncionario[funcionarioId] || 0) + total;
             if (dia) totalPorDia[dia] = (totalPorDia[dia] || 0) + total;
         });
 
         const qtdPorProduto = {};
-        detalhes.forEach(d => {
-            const pid = String((d && d.produto_id) || '');
-            const q = parseInt((d && d.quantidade) || 0, 10) || 0;
-            if (pid) qtdPorProduto[pid] = (qtdPorProduto[pid] || 0) + q;
-        });
+        detalhes
+            .filter((d) => entregueIds.has(String(d.encomenda_id)))
+            .forEach((d) => {
+                const pid = String(d.produto_id || '');
+                const q = parseInt(d.quantidade || 0, 10) || 0;
+                if (pid) qtdPorProduto[pid] = (qtdPorProduto[pid] || 0) + q;
+            });
 
         const topCliente = Object.entries(gastoPorCliente).sort((a, b) => b[1] - a[1])[0];
         const topFuncionario = Object.entries(vendasPorFuncionario).sort((a, b) => b[1] - a[1])[0];
         const topProduto = Object.entries(qtdPorProduto).sort((a, b) => b[1] - a[1])[0];
         const melhorDia = Object.entries(totalPorDia).sort((a, b) => b[1] - a[1])[0];
 
-        const ticketMedio = encomendas.length ? (totalVendas / encomendas.length) : 0;
-        const taxaEntrega = encomendas.length ? ((encomendasByStatus.entregue / encomendas.length) * 100) : 0;
+        const nEntregues = encomendasByStatus.entregue;
+        const ticketMedio = nEntregues > 0 ? totalVendas / nEntregues : 0;
+        const taxaEntrega = encomendas.length ? (nEntregues / encomendas.length) * 100 : 0;
 
         if (topCliente) {
             const c = clientesMap[topCliente[0]] || {};
             document.getElementById('topClienteNome').textContent = c.nome || ('Cliente #' + topCliente[0]);
-            document.getElementById('topClienteInfo').textContent = `Total gasto: €${topCliente[1].toFixed(2)}`;
+            document.getElementById('topClienteInfo').textContent =
+                `Total em encomendas entregues: €${topCliente[1].toFixed(2)}`;
         }
         if (topFuncionario) {
             const f = funcionariosMap[topFuncionario[0]] || {};
             document.getElementById('topFuncionarioNome').textContent = (f.cargo ? `${f.cargo} ` : '') + `#${topFuncionario[0]}`;
-            document.getElementById('topFuncionarioInfo').textContent = `Vendas geridas: €${topFuncionario[1].toFixed(2)}`;
+            document.getElementById('topFuncionarioInfo').textContent =
+                `Receita entregue gerida: €${topFuncionario[1].toFixed(2)}`;
         }
         if (topProduto) {
             const p = produtosMap[topProduto[0]] || {};

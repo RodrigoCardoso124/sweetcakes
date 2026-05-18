@@ -8,6 +8,7 @@ class Pessoa {
     public $email;
     public $telemovel;
     public $morada;
+    public $nif;
     public $data_registo;
 
     public function __construct($db) {
@@ -50,27 +51,59 @@ class Pessoa {
     }
 
     public function create() {
-        $query = "INSERT INTO {$this->table} (nome, email, telemovel, morada)
-                  VALUES (:nome, :email, :telemovel, :morada)";
+        if ($this->hasColumn('nif')) {
+            $query = "INSERT INTO {$this->table} (nome, email, telemovel, morada, nif)
+                      VALUES (:nome, :email, :telemovel, :morada, :nif)";
+        } else {
+            $query = "INSERT INTO {$this->table} (nome, email, telemovel, morada)
+                      VALUES (:nome, :email, :telemovel, :morada)";
+        }
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":nome", $this->nome);
         $stmt->bindValue(":email", $this->email);
         $stmt->bindValue(":telemovel", $this->telemovel);
         $stmt->bindValue(":morada", $this->morada);
+        if ($this->hasColumn('nif')) {
+            $stmt->bindValue(":nif", $this->nif ?: null);
+        }
         return $stmt->execute();
     }
 
     public function update() {
-        $query = "UPDATE {$this->table}
-                  SET nome = :nome, email = :email, telemovel = :telemovel, morada = :morada
-                  WHERE pessoa_id = :id";
+        if ($this->hasColumn('nif')) {
+            $query = "UPDATE {$this->table}
+                      SET nome = :nome, email = :email, telemovel = :telemovel, morada = :morada, nif = :nif
+                      WHERE pessoa_id = :id";
+        } else {
+            $query = "UPDATE {$this->table}
+                      SET nome = :nome, email = :email, telemovel = :telemovel, morada = :morada
+                      WHERE pessoa_id = :id";
+        }
         $stmt  = $this->conn->prepare($query);
         $stmt->bindValue(":nome", $this->nome);
         $stmt->bindValue(":email", $this->email);
         $stmt->bindValue(":telemovel", $this->telemovel);
         $stmt->bindValue(":morada", $this->morada);
+        if ($this->hasColumn('nif')) {
+            $stmt->bindValue(":nif", $this->nif ?: null);
+        }
         $stmt->bindValue(":id", $this->pessoa_id);
         return $stmt->execute();
+    }
+
+    private function hasColumn(string $column): bool
+    {
+        static $cache = [];
+        $key = $column;
+        if (!isset($cache[$key])) {
+            $stmt = $this->conn->prepare(
+                'SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c'
+            );
+            $stmt->execute([':t' => $this->table, ':c' => $column]);
+            $cache[$key] = (int) $stmt->fetchColumn() > 0;
+        }
+        return $cache[$key];
     }
 
     public function delete() {
