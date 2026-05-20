@@ -590,17 +590,13 @@ const API = {
         if (!fid) {
             throw new Error('Sem ficheiro arquivado');
         }
-        const sessionId = localStorage.getItem('apiSessionId') || '';
-        const token = localStorage.getItem('adminToken') || sessionId;
-        let url =
-            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(fid))}&inline=1`;
-        if (sessionId) {
-            url += '&access_token=' + encodeURIComponent(sessionId);
-        }
+        const { url } = await this.downloadFaturacaoFicheiro(fid, true);
         const w = window.open(url, '_blank', 'noopener,noreferrer');
         if (!w) {
+            URL.revokeObjectURL(url);
             throw new Error('O browser bloqueou o popup. Permita popups para este site.');
         }
+        setTimeout(() => URL.revokeObjectURL(url), 120000);
     },
 
     async _faturacaoMultipart(formData) {

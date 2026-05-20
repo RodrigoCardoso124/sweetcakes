@@ -230,7 +230,7 @@ async function savePed() {
 async function abrirFaturaPedido(p) {
   try {
     if (typeof API.openFaturacaoFicheiro === 'function') {
-      await API.openFaturacaoFicheiro(p.ficheiro_id, p.url_abrir);
+      await API.openFaturacaoFicheiro(p.ficheiro_id);
       return;
     }
     showToast('Sem PDF arquivado para este pedido', 'warning');
@@ -348,8 +348,8 @@ async function saveRec() {
   try {
     const res = await API.updatePedidoIngredienteRecebido(id, payload, pdfFile);
     showToast('Pedido recebido — compra e PDF arquivados', 'success');
-    if (res.ficheiro_id || res.url_abrir) {
-      await API.openFaturacaoFicheiro(res.ficheiro_id, res.url_abrir);
+    if (res.ficheiro_id) {
+      await API.openFaturacaoFicheiro(res.ficheiro_id);
     }
     document.querySelector('#recModal .modal-actions').style.display = 'none';
     document.getElementById('recLucroWrap').style.display = 'block';

@@ -54,7 +54,6 @@ class PedidoIngredienteController
                 $p['recebida_id'] = (int) $r['recebida_id'];
                 $p['tem_ficheiro'] = !empty($r['tem_ficheiro']);
                 $p['ficheiro_id'] = $r['ficheiro_id'] ?? null;
-                $p['url_abrir'] = $r['url_abrir'] ?? null;
                 if (!empty($r['numero']) && empty($p['num_fatura'])) {
                     $p['num_fatura'] = $r['numero'];
                 }

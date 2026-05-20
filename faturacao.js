@@ -61,34 +61,21 @@ function switchTab(tab) {
 
 function botaoAbrirFicheiro(item) {
   const fid = item.ficheiro_id || (item.ficheiro && item.ficheiro.ficheiro_id);
-  const url = item.url_abrir || documentUrlFromRow(item.ficheiro);
-  if (!fid && !url) {
+  if (!fid) {
     return '<span class="muted">Sem PDF</span>';
   }
-  const urlAttr = url ? ' data-abrir-url="' + String(url).replace(/"/g, '&quot;') + '"' : '';
   return (
     '<button type="button" class="btn btn-primary btn-sm" data-abrir-ficheiro="' +
-    (fid || '') +
-    '"' +
-    urlAttr +
-    '>Abrir ficheiro</button>'
+    fid +
+    '">Abrir ficheiro</button>'
   );
-}
-
-function documentUrlFromRow(f) {
-  if (!f || !f.caminho_relativo) return '';
-  const c = String(f.caminho_relativo);
-  if (/^https?:\/\//i.test(c)) return c;
-  return '';
 }
 
 function ligarAbrirFicheiro(root) {
   if (!root) return;
   root.querySelectorAll('[data-abrir-ficheiro]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const url = btn.getAttribute('data-abrir-url');
-      const fid = btn.getAttribute('data-abrir-ficheiro');
-      abrirFicheiro(fid, url);
+      abrirFicheiro(btn.getAttribute('data-abrir-ficheiro'));
     });
   });
   root.querySelectorAll('[data-upload-doc]').forEach((btn) => {
@@ -114,9 +101,9 @@ function ligarAbrirFicheiro(root) {
   });
 }
 
-async function abrirFicheiro(ficheiroId, urlDirecta) {
+async function abrirFicheiro(ficheiroId) {
   try {
-    await API.openFaturacaoFicheiro(ficheiroId, urlDirecta);
+    await API.openFaturacaoFicheiro(ficheiroId);
   } catch (e) {
     if (typeof showToast === 'function') showToast(e.message, 'warning');
   }
@@ -325,8 +312,8 @@ async function emitirEncomenda(encomendaId) {
     let msg = 'Fatura ' + (r.documento || '') + ' emitida';
     if (typeof showToast === 'function') showToast(msg, 'success');
     await loadAll();
-    if (r.ficheiro_id || r.url_abrir) {
-      await API.openFaturacaoFicheiro(r.ficheiro_id, r.url_abrir);
+    if (r.ficheiro_id) {
+      await API.openFaturacaoFicheiro(r.ficheiro_id);
     } else if (r.pdf_aviso) {
       if (typeof showToast === 'function') showToast(r.pdf_aviso, 'warning');
     }
@@ -365,7 +352,7 @@ async function addRecebida() {
     document.getElementById('recValor').value = '';
     pdfInput.value = '';
     await loadAll();
-    if (res.url_abrir) window.open(res.url_abrir, '_blank', 'noopener');
+    if (res.ficheiro_id) await API.openFaturacaoFicheiro(res.ficheiro_id);
   } catch (e) {
     if (typeof showToast === 'function') showToast(e.message, 'warning');
   }

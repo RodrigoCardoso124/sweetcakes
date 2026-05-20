@@ -45,7 +45,7 @@ class FaturacaoController
                 return;
             }
             $inline = !empty($_GET['inline']);
-            $jsonMeta = !empty($_GET['meta']) || (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+            $jsonMeta = !empty($_GET['meta']);
             DocumentStorageService::enviarDownload($this->db, $fid, $inline, $jsonMeta);
 
             return;

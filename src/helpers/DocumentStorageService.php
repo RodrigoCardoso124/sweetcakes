@@ -278,10 +278,6 @@ class DocumentStorageService
                 'tamanho_bytes' => $tamanho,
                 'sha256' => $sha,
             ];
-            if (CloudinaryUploadHelper::isUrlArmazenamento($caminho)) {
-                $out['url_abrir'] = $caminho;
-            }
-
             return $out;
         } catch (Throwable $e) {
             if ($ownTx && $db->inTransaction()) {
@@ -405,38 +401,19 @@ class DocumentStorageService
         self::limparBuffersResposta();
 
         $err = null;
-        $body = CloudinaryUploadHelper::downloadBytes($url, $err);
+        $body = CloudinaryUploadHelper::fetchUrlBytes($url, $err);
         if ($body !== null) {
             self::enviarPdfBytes($body, $row, $inline);
 
             return;
         }
 
-        $dest = CloudinaryUploadHelper::browserDownloadUrl($url);
-        if ($dest !== null && $dest !== '' && CloudinaryUploadHelper::isCdnDeliveryUrl($dest)) {
-            header('Cache-Control: private, max-age=300');
-            header('Location: ' . $dest, true, 302);
-            exit;
-        }
-
-        if (CloudinaryUploadHelper::isUrlArmazenamento($url)) {
-            http_response_code(502);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode([
-                'message' => $err ?: 'Não foi possível obter o PDF do Cloudinary.',
-                'hint' => 'Confirme CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no Vercel (par da mesma conta). Se o erro persistir, volte a enviar o PDF.',
-            ], JSON_UNESCAPED_UNICODE);
-
-            return;
-        }
-
         http_response_code(502);
         header('Content-Type: application/json; charset=UTF-8');
-        $payload = ['message' => $err ?: 'Não foi possível obter o PDF do armazenamento'];
-        if (defined('APP_DEBUG') && APP_DEBUG) {
-            $payload['url_origem'] = $url;
-        }
-        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+        echo json_encode([
+            'message' => $err ?: 'Não foi possível obter o PDF do Cloudinary.',
+            'hint' => 'Use o mesmo upload_preset das imagens de produtos (acesso público). PDFs antigos: volte a enviar o ficheiro (Receber pedido ou Faturação).',
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     public static function anexarMetadados(PDO $db, string $tipo, array $rows): array
@@ -476,7 +453,6 @@ class DocumentStorageService
             $r['ficheiro'] = $map[$did] ?? null;
             if (isset($map[$did])) {
                 $r['ficheiro_id'] = (int) $map[$did]['ficheiro_id'];
-                $r['url_abrir'] = self::urlAbrir($map[$did]);
             }
         }
         unset($r);
@@ -508,10 +484,13 @@ class DocumentStorageService
         );
         $stmt->execute([$tipo, $documentoId, $origem]);
         while ($old = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $path = self::storageRoot() . DIRECTORY_SEPARATOR
-                . str_replace('/', DIRECTORY_SEPARATOR, (string) $old['caminho_relativo']);
-            if (is_file($path)) {
-                @unlink($path);
+            $rel = (string) ($old['caminho_relativo'] ?? '');
+            if (!CloudinaryUploadHelper::isUrlArmazenamento($rel)) {
+                $path = self::storageRoot() . DIRECTORY_SEPARATOR
+                    . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+                if (is_file($path)) {
+                    @unlink($path);
+                }
             }
             $del = $db->prepare('DELETE FROM documento_ficheiros WHERE ficheiro_id = ?');
             $del->execute([(int) $old['ficheiro_id']]);

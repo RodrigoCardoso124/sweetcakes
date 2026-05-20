@@ -30,17 +30,16 @@ $cfg = CloudinaryUploadHelper::loadConfig();
 $probeUrl = isset($_GET['url']) ? trim((string) $_GET['url']) : '';
 $probe = null;
 if ($probeUrl !== '' && preg_match('#^https?://#i', $probeUrl)) {
-    $parsed = CloudinaryUploadHelper::parseDeliveryUrl($probeUrl);
-    $meta = CloudinaryUploadHelper::adminFetchResource($probeUrl);
+    $norm = CloudinaryUploadHelper::normalizeDeliveryUrl($probeUrl);
+    $err = null;
+    $bytes = CloudinaryUploadHelper::fetchUrlBytes($probeUrl, $err);
     $probe = [
         'url' => $probeUrl,
-        'parse_ok' => $parsed !== null,
-        'parsed' => $parsed,
-        'admin_found' => is_array($meta),
-        'admin_public_id' => $meta['public_id'] ?? null,
-        'admin_version' => $meta['version'] ?? null,
-        'admin_type' => $meta['type'] ?? null,
-        'browser_download_url' => CloudinaryUploadHelper::browserDownloadUrl($probeUrl),
+        'url_normalizada' => $norm,
+        'pdf_ok' => $bytes !== null && strncmp($bytes, '%PDF', 4) === 0,
+        'bytes' => $bytes !== null ? strlen($bytes) : 0,
+        'erro' => $err,
+        'nota' => 'O painel abre PDFs via /faturacao?view=download (mesmo domínio), não via URL Cloudinary no browser.',
     ];
 }
 
@@ -53,7 +52,7 @@ $payload = [
         'has_api_secret' => !empty($cfg['api_secret']),
         'has_upload_preset' => !empty($cfg['upload_preset']),
         'missing' => $cfg['missing'] ?? [],
-        'nota' => 'PDFs vão para CLOUDINARY_FOLDER + /faturacao (ex.: sweet_cakes/produtos/faturacao). Não precisa de variável à parte.',
+        'nota' => 'PDFs usam image/upload (igual às fotos), pasta CLOUDINARY_FOLDER/faturacao. Teste completo: /api/test_pdf_cloudinary.php?access_token=...',
     ],
     'env_detected' => [
         'CLOUDINARY_CLOUD_NAME' => !empty($_ENV['CLOUDINARY_CLOUD_NAME']) || !empty($_SERVER['CLOUDINARY_CLOUD_NAME']) || getenv('CLOUDINARY_CLOUD_NAME'),
