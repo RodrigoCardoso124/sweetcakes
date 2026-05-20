@@ -585,23 +585,22 @@ const API = {
         return { blob: typed, nome, url: URL.createObjectURL(typed), externo: false };
     },
 
-    async openFaturacaoFicheiro(ficheiroId, urlDirecta) {
+    async openFaturacaoFicheiro(ficheiroId) {
         const fid = parseInt(String(ficheiroId || ''), 10);
         if (!fid) {
             throw new Error('Sem ficheiro arquivado');
         }
-        const r = await this.downloadFaturacaoFicheiro(fid, true);
-        const a = document.createElement('a');
-        a.href = r.url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.title = r.nome || 'documento.pdf';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => {
-            URL.revokeObjectURL(r.url);
-            a.remove();
-        }, 120000);
+        const sessionId = localStorage.getItem('apiSessionId') || '';
+        const token = localStorage.getItem('adminToken') || sessionId;
+        let url =
+            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(fid))}&inline=1`;
+        if (sessionId) {
+            url += '&access_token=' + encodeURIComponent(sessionId);
+        }
+        const w = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!w) {
+            throw new Error('O browser bloqueou o popup. Permita popups para este site.');
+        }
     },
 
     async _faturacaoMultipart(formData) {

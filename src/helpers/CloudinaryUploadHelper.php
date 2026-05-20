@@ -423,6 +423,47 @@ class CloudinaryUploadHelper
         );
     }
 
+    /**
+     * URL para o browser abrir o PDF (API Cloudinary assinada ou CDN).
+     * Não faz download no servidor — evita timeout 502 no Vercel.
+     */
+    public static function browserDownloadUrl(string $secureUrl): ?string
+    {
+        $cfg = self::loadConfig();
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        if ($parsed === null) {
+            return $secureUrl;
+        }
+
+        $publicId = preg_replace('/\.pdf$/i', '', $parsed['public_id']);
+
+        if ($publicId !== '' && !empty($cfg['api_secret'])) {
+            $types = array_values(array_unique([
+                $parsed['delivery_type'],
+                'upload',
+                'authenticated',
+                null,
+            ]));
+            foreach ($types as $type) {
+                $apiUrl = self::apiPrivateDownloadUrl(
+                    $publicId,
+                    'pdf',
+                    $parsed['resource_type'],
+                    $type
+                );
+                if ($apiUrl !== null) {
+                    return $apiUrl;
+                }
+            }
+            $signed = self::signedDeliveryUrl($secureUrl);
+            if ($signed !== null) {
+                return $signed;
+            }
+        }
+
+        return $secureUrl;
+    }
+
     private static function looksLikePdf(?string $body): bool
     {
         return $body !== null && strlen($body) > 50 && strncmp($body, '%PDF', 4) === 0;

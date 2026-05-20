@@ -327,8 +327,17 @@ class DocumentStorageService
         return null;
     }
 
+    private static function limparBuffersResposta(): void
+    {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header_remove('Content-Type');
+    }
+
     public static function enviarDownload(PDO $db, int $ficheiroId, bool $inline = false, bool $jsonMeta = false): void
     {
+        self::limparBuffersResposta();
         $row = self::obter($db, $ficheiroId);
         if (!$row) {
             http_response_code(404);
@@ -379,6 +388,15 @@ class DocumentStorageService
 
     private static function enviarConteudoRemoto(string $url, array $row, bool $inline): void
     {
+        self::limparBuffersResposta();
+
+        $dest = CloudinaryUploadHelper::browserDownloadUrl($url);
+        if ($dest !== null && $dest !== '') {
+            header('Cache-Control: private, max-age=300');
+            header('Location: ' . $dest, true, 302);
+            exit;
+        }
+
         $err = null;
         $body = CloudinaryUploadHelper::downloadBytes($url, $err);
         if ($body === null) {
