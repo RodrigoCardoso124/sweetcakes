@@ -433,9 +433,9 @@ class CloudinaryUploadHelper
     }
 
     /**
-     * Reconstrói URL CDN com extensão .pdf (raw sem .pdf na URL dá "Resource not found").
+     * Reconstrói URL CDN com extensão .pdf e tipo de entrega correcto (upload/authenticated).
      */
-    public static function normalizeDeliveryUrl(string $secureUrl): string
+    public static function normalizeDeliveryUrl(string $secureUrl, ?array $meta = null): string
     {
         $parsed = self::parseDeliveryUrl($secureUrl);
         if ($parsed === null) {
@@ -451,67 +451,110 @@ class CloudinaryUploadHelper
             $publicId .= '.pdf';
         }
 
-        $vPart = $parsed['version'] !== null && $parsed['version'] !== ''
-            ? 'v' . $parsed['version'] . '/'
-            : '';
+        $deliveryType = (string) ($meta['type'] ?? $parsed['delivery_type']);
+        $version = isset($meta['version']) ? (string) $meta['version'] : $parsed['version'];
+        $vPart = $version !== null && $version !== '' ? 'v' . $version . '/' : '';
 
         return 'https://res.cloudinary.com/'
             . $parsed['cloud'] . '/'
             . $parsed['resource_type'] . '/'
-            . $parsed['delivery_type'] . '/'
+            . $deliveryType . '/'
             . $vPart
             . $publicId;
     }
 
     /**
-     * URL para o browser (CDN ou assinada). Evita redirect para api.cloudinary.com/.../download (JSON de erro).
+     * URL para o browser abrir o PDF.
+     * Prioridade: API /raw/download (funciona com authenticated) → CDN assinada → CDN directa.
      */
     public static function browserDownloadUrl(string $secureUrl): ?string
     {
         $cfg = self::loadConfig();
         $parsed = self::parseDeliveryUrl($secureUrl);
-
         $meta = self::adminFetchResource($secureUrl);
-        if (is_array($meta) && !empty($meta['secure_url'])) {
-            $canonical = (string) $meta['secure_url'];
-            if (($meta['access_mode'] ?? '') === 'public' && ($meta['type'] ?? '') === 'upload') {
-                return self::normalizeDeliveryUrl($canonical);
-            }
-            if (!empty($cfg['api_secret'])) {
-                $signed = self::signedDeliveryUrl($canonical, $meta);
-                if ($signed !== null) {
-                    return $signed;
+
+        $publicId = preg_replace(
+            '/\.pdf$/i',
+            '',
+            (string) ($meta['public_id'] ?? $parsed['public_id'] ?? '')
+        );
+        $format = (string) ($meta['format'] ?? 'pdf');
+        $resourceType = (string) ($meta['resource_type'] ?? $parsed['resource_type'] ?? 'raw');
+
+        if ($publicId !== '' && !empty($cfg['api_secret'])) {
+            $types = array_values(array_unique(array_filter([
+                $meta['type'] ?? null,
+                $parsed['delivery_type'] ?? null,
+                'upload',
+                'authenticated',
+                null,
+            ], static fn ($t) => $t !== '')));
+            foreach ($types as $type) {
+                $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type);
+                if ($apiUrl !== null) {
+                    return $apiUrl;
                 }
             }
-
-            return self::normalizeDeliveryUrl($canonical);
         }
 
-        if ($parsed === null) {
-            return $secureUrl;
-        }
-
-        $cdn = self::normalizeDeliveryUrl($secureUrl);
-
-        if ($parsed['delivery_type'] === 'upload') {
-            if (!empty($cfg['api_secret'])) {
-                $signed = self::signedDeliveryUrl($cdn);
-                if ($signed !== null) {
-                    return $signed;
-                }
-            }
-
-            return $cdn;
-        }
-
+        $base = (string) ($meta['secure_url'] ?? $secureUrl);
         if (!empty($cfg['api_secret'])) {
-            $signed = self::signedDeliveryUrl($cdn, $meta);
-            if ($signed !== null) {
-                return $signed;
+            $signedList = self::signedDeliveryUrlCandidates($base, $meta);
+            if ($signedList !== []) {
+                return $signedList[0];
             }
         }
 
-        return $cdn;
+        if (($meta['access_mode'] ?? '') === 'public' && ($meta['type'] ?? 'upload') === 'upload') {
+            return self::normalizeDeliveryUrl($base, $meta);
+        }
+
+        return self::normalizeDeliveryUrl($base, $meta);
+    }
+
+    /**
+     * Várias URLs assinadas possíveis (Cloudinary varia com/sem versão no toSign).
+     *
+     * @return string[]
+     */
+    private static function signedDeliveryUrlCandidates(string $secureUrl, ?array $meta): array
+    {
+        $cfg = self::loadConfig();
+        if (empty($cfg['api_secret'])) {
+            return [];
+        }
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        if ($parsed === null && $meta === null) {
+            return [];
+        }
+
+        $cloud = $parsed['cloud'] ?? self::resolveCloudName($secureUrl) ?? '';
+        $resourceType = $parsed['resource_type'] ?? 'raw';
+        $deliveryType = (string) ($meta['type'] ?? $parsed['delivery_type'] ?? 'authenticated');
+        $version = $parsed['version'] ?? (isset($meta['version']) ? (string) $meta['version'] : null);
+
+        $baseId = preg_replace('/\.pdf$/i', '', (string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
+        $format = (string) ($meta['format'] ?? 'pdf');
+        $withExt = $baseId . '.' . $format;
+
+        $toSignList = [$withExt];
+        if ($version !== null && $version !== '') {
+            array_unshift($toSignList, 'v' . $version . '/' . $withExt);
+        }
+
+        $urls = [];
+        foreach ($toSignList as $toSign) {
+            $urls[] = self::buildSignedDeliveryUrl(
+                $cloud,
+                $resourceType,
+                $deliveryType,
+                $version,
+                $toSign,
+                (string) $cfg['api_secret']
+            );
+        }
+
+        return array_values(array_unique($urls));
     }
 
     private static function looksLikePdf(?string $body): bool
