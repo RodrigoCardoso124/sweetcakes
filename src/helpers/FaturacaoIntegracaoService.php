@@ -11,6 +11,9 @@ class FaturacaoIntegracaoService
 {
     public static function sincronizarPedidoRecebido(PDO $db, int $pedidoId, ?float $taxaIva = null): array
     {
+        if (!FaturacaoService::tabelasOk($db)) {
+            return ['skipped' => true, 'hint' => 'migrate_009'];
+        }
         if (!LucroCalculator::tableExists($db, 'pedidos_ingrediente')) {
             return ['skipped' => true];
         }

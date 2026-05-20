@@ -131,6 +131,13 @@ if ($httpMethod === 'POST' && isset($_POST['_method'])) {
         $httpMethod = $override;
     }
 }
+// Vercel: multipart POST por vezes não envia _method — receber pedido com ficheiro
+if ($httpMethod === 'POST' && $id && $resource === 'pedidos_ingrediente' && !empty($files)) {
+    $estadoPost = trim((string) ($_POST['estado'] ?? ''));
+    if ($estadoPost === 'recebido' || $estadoPost === 'cancelado' || $estadoPost === 'pendente') {
+        $httpMethod = 'PUT';
+    }
+}
 
 $routes = [
     'pessoas' => 'PessoaController',
@@ -392,7 +399,10 @@ try {
             break;
 
         case 'POST':
-            if (!empty($files)) {
+            if ($id && $resource === 'pedidos_ingrediente' && !empty($files)) {
+                $putData = array_merge($_POST, is_array($input) ? $input : []);
+                $controller->update($id, $putData, $files);
+            } elseif (!empty($files)) {
                 $controller->store($_POST, $files);
             } else {
                 $controller->store($input);

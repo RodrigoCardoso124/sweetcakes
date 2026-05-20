@@ -44,9 +44,6 @@ class CloudinaryUploadHelper
         return (bool) (self::loadConfig()['enabled'] ?? false);
     }
 
-    /**
-     * @return string|null secure_url
-     */
     public static function uploadRawFile(string $path, string $mime, string $displayName, ?string &$error = null): ?string
     {
         if (!is_readable($path)) {
@@ -61,9 +58,6 @@ class CloudinaryUploadHelper
         );
     }
 
-    /**
-     * @return string|null secure_url
-     */
     public static function uploadRawBytes(string $bytes, string $mime, string $displayName, ?string &$error = null): ?string
     {
         $tmp = tempnam(sys_get_temp_dir(), 'scfat_');
@@ -101,13 +95,27 @@ class CloudinaryUploadHelper
             'folder' => $folder,
             'resource_type' => 'raw',
             'format' => 'pdf',
+            'type' => 'upload',
+            'access_mode' => 'public',
         ];
 
         if (!empty($cfg['upload_preset'])) {
             $postFields['upload_preset'] = $cfg['upload_preset'];
         } else {
             $timestamp = time();
-            $toSign = "folder={$folder}&timestamp={$timestamp}" . $cfg['api_secret'];
+            $signParams = [
+                'access_mode' => 'public',
+                'folder' => $folder,
+                'format' => 'pdf',
+                'timestamp' => (string) $timestamp,
+                'type' => 'upload',
+            ];
+            ksort($signParams);
+            $pairs = [];
+            foreach ($signParams as $k => $v) {
+                $pairs[] = $k . '=' . $v;
+            }
+            $toSign = implode('&', $pairs) . $cfg['api_secret'];
             $postFields['api_key'] = $cfg['api_key'];
             $postFields['timestamp'] = $timestamp;
             $postFields['signature'] = sha1($toSign);
@@ -144,5 +152,144 @@ class CloudinaryUploadHelper
     public static function isUrlArmazenamento(string $caminho): bool
     {
         return (bool) preg_match('#^https?://#i', $caminho);
+    }
+
+    /**
+     * @return array{cloud: string, resource_type: string, delivery_type: string, version: ?string, public_id: string}|null
+     */
+    public static function parseDeliveryUrl(string $url): ?array
+    {
+        if (!preg_match(
+            '#res\.cloudinary\.com/([^/]+)/(raw|image)/(upload|authenticated|private)(?:/s--[^/]+--/)?(?:v(\d+)/)?(.+?)(?:\?.*)?$#i',
+            $url,
+            $m
+        )) {
+            return null;
+        }
+
+        $publicId = $m[5];
+        while (preg_match('#^(?:fl_[^/]+|c_[^/]+|w_\d+|h_\d+)(?:,[^/]+)*/#', $publicId)) {
+            $publicId = preg_replace('#^[^/]+/#', '', $publicId, 1);
+        }
+
+        return [
+            'cloud' => $m[1],
+            'resource_type' => strtolower($m[2]),
+            'delivery_type' => strtolower($m[3]),
+            'version' => isset($m[4]) && $m[4] !== '' ? $m[4] : null,
+            'public_id' => $publicId,
+        ];
+    }
+
+    public static function publicIdFromUrl(string $url): ?string
+    {
+        $p = self::parseDeliveryUrl($url);
+
+        return $p ? $p['public_id'] : null;
+    }
+
+    private static function deliverySignatureComponent(string $toSign, string $apiSecret): string
+    {
+        $hash = sha1($toSign . $apiSecret, true);
+        $b64 = rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+
+        return 's--' . substr($b64, 0, 8) . '--';
+    }
+
+    public static function signedDeliveryUrl(string $secureUrl): ?string
+    {
+        $cfg = self::loadConfig();
+        if (empty($cfg['api_secret'])) {
+            return null;
+        }
+
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        if ($parsed === null) {
+            return null;
+        }
+
+        $publicId = $parsed['public_id'];
+        if ($parsed['resource_type'] === 'raw' && !preg_match('/\.pdf$/i', $publicId)) {
+            $publicId .= '.pdf';
+        }
+
+        $sig = self::deliverySignatureComponent($publicId, (string) $cfg['api_secret']);
+        $vPart = $parsed['version'] !== null ? 'v' . $parsed['version'] . '/' : '';
+
+        return 'https://res.cloudinary.com/'
+            . $parsed['cloud'] . '/'
+            . $parsed['resource_type'] . '/'
+            . $parsed['delivery_type'] . '/'
+            . $sig
+            . $vPart
+            . $publicId;
+    }
+
+    public static function downloadBytes(string $secureUrl, ?string &$error = null): ?string
+    {
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        $cfg = self::loadConfig();
+
+        if ($parsed !== null && in_array($parsed['delivery_type'], ['authenticated', 'private'], true)) {
+            $signed = self::signedDeliveryUrl($secureUrl);
+            if ($signed !== null) {
+                $body = self::downloadBytesDirect($signed, $errSigned);
+                if ($body !== null) {
+                    return $body;
+                }
+                $error = $errSigned;
+            }
+        }
+
+        $body = self::downloadBytesDirect($secureUrl, $errDirect);
+        if ($body !== null) {
+            return $body;
+        }
+
+        if (!empty($cfg['api_secret'])) {
+            $signed = self::signedDeliveryUrl($secureUrl);
+            if ($signed !== null && $signed !== $secureUrl) {
+                $body = self::downloadBytesDirect($signed, $errSigned2);
+                if ($body !== null) {
+                    return $body;
+                }
+                $error = $errSigned2 ?: $errDirect;
+            }
+        }
+
+        if (empty($cfg['api_secret'])) {
+            $error = ($error ?: $errDirect) . ' — configure CLOUDINARY_API_SECRET no Vercel';
+        } else {
+            $error = $error ?: $errDirect;
+        }
+
+        return null;
+    }
+
+    private static function downloadBytesDirect(string $url, ?string &$error = null): ?string
+    {
+        if (!function_exists('curl_init')) {
+            $error = 'cURL não disponível';
+
+            return null;
+        }
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 90,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+        if ($body === false || $code < 200 || $code >= 400) {
+            $error = 'Não foi possível obter o PDF: ' . ($curlErr ?: 'HTTP ' . $code);
+
+            return null;
+        }
+
+        return $body;
     }
 }

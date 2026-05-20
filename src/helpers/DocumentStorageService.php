@@ -243,8 +243,11 @@ class DocumentStorageService
         string $origem,
         ?int $criadoPor
     ): array {
+        $ownTx = !$db->inTransaction();
         try {
-            $db->beginTransaction();
+            if ($ownTx) {
+                $db->beginTransaction();
+            }
             self::removerPorDocumento($db, $tipoDocumento, $documentoId, $origem, false);
             $stmt = $db->prepare(
                 'INSERT INTO documento_ficheiros
@@ -265,7 +268,9 @@ class DocumentStorageService
             ]);
             $ficheiroId = (int) $db->lastInsertId();
             self::ligarDocumento($db, $tipoDocumento, $documentoId, $ficheiroId);
-            $db->commit();
+            if ($ownTx) {
+                $db->commit();
+            }
             $out = [
                 'ficheiro_id' => $ficheiroId,
                 'nome_original' => $nomeOriginal,
@@ -279,7 +284,7 @@ class DocumentStorageService
 
             return $out;
         } catch (Throwable $e) {
-            if ($db->inTransaction()) {
+            if ($ownTx && $db->inTransaction()) {
                 $db->rollBack();
             }
 
@@ -374,28 +379,12 @@ class DocumentStorageService
 
     private static function enviarConteudoRemoto(string $url, array $row, bool $inline): void
     {
-        if (!function_exists('curl_init')) {
+        $err = null;
+        $body = CloudinaryUploadHelper::downloadBytes($url, $err);
+        if ($body === null) {
             http_response_code(502);
             header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['message' => 'cURL necessário para obter ficheiro remoto']);
-
-            return;
-        }
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 90,
-            CURLOPT_SSL_VERIFYPEER => true,
-        ]);
-        $body = curl_exec($ch);
-        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr = curl_error($ch);
-        curl_close($ch);
-        if ($body === false || $code < 200 || $code >= 400) {
-            http_response_code(502);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['message' => 'Não foi possível obter o PDF: ' . ($curlErr ?: 'HTTP ' . $code)]);
+            echo json_encode(['message' => $err ?: 'Não foi possível obter o PDF do armazenamento']);
 
             return;
         }

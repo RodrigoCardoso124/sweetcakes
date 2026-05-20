@@ -399,7 +399,9 @@ const API = {
         const url = `${API_BASE_URL}/pedidos_ingrediente/${id}`;
         const fd = new FormData();
         fd.append('_method', 'PUT');
+        fd.append('estado', data.estado || 'recebido');
         Object.keys(data).forEach((k) => {
+            if (k === 'estado') return;
             if (data[k] != null && data[k] !== '') fd.append(k, String(data[k]));
         });
         fd.append('documento', pdfFile);
@@ -417,7 +419,10 @@ const API = {
             throw new Error('Resposta inválida do servidor');
         }
         if (!response.ok) {
-            throw new Error(result.message || 'Erro ao receber pedido');
+            const detail = result.error_detail || result.hint || '';
+            throw new Error(
+                (result.message || 'Erro ao receber pedido') + (detail ? ' — ' + detail : '')
+            );
         }
         return result;
     },

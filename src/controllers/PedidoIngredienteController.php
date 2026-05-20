@@ -187,7 +187,7 @@ class PedidoIngredienteController
         if (!is_array($data)) {
             $data = [];
         }
-        if (!empty($_POST) && empty($data['estado'])) {
+        if (!empty($_POST)) {
             $data = array_merge($data, $_POST);
         }
         unset($data['_method'], $data['action']);
@@ -229,10 +229,33 @@ class PedidoIngredienteController
                 if (file_exists(__DIR__ . '/../helpers/FaturacaoIntegracaoService.php')) {
                     require_once __DIR__ . '/../helpers/FaturacaoIntegracaoService.php';
                     $fiscal = FaturacaoIntegracaoService::sincronizarPedidoRecebido($this->db, (int) $id);
+                    if (!empty($fiscal['error'])) {
+                        $this->db->rollBack();
+                        http_response_code(400);
+                        echo json_encode([
+                            'message' => $fiscal['error'],
+                            'hint' => 'Execute /api/migrate_009_faturacao.php no Vercel',
+                        ], JSON_UNESCAPED_UNICODE);
+
+                        return;
+                    }
                 }
+                $this->db->commit();
+
                 $pdf = $this->extrairPdfRececao($files);
                 $arquivo = [];
-                if ($pdf && !empty($fiscal['recebida_id'])) {
+                if ($pdf) {
+                    if (empty($fiscal['recebida_id'])) {
+                        echo json_encode([
+                            'message' => 'Pedido recebido, mas o PDF não foi arquivado (módulo fiscal em falta).',
+                            'pedido_id' => (int) $id,
+                            'estado' => $estado,
+                            'fiscal' => $fiscal,
+                            'hint' => 'Abra no browser: /api/migrate_009_faturacao.php e /api/migrate_012_documentos.php',
+                        ], JSON_UNESCAPED_UNICODE);
+
+                        return;
+                    }
                     require_once __DIR__ . '/../helpers/DocumentStorageService.php';
                     $arquivo = DocumentStorageService::guardarUpload(
                         $this->db,
@@ -243,23 +266,16 @@ class PedidoIngredienteController
                         Auth::pessoaId()
                     );
                     if (!empty($arquivo['error'])) {
-                        $this->db->rollBack();
                         http_response_code($arquivo['code'] ?? 500);
                         echo json_encode([
                             'message' => $arquivo['error'],
-                            'hint' => 'Confirme Cloudinary no Vercel (CLOUDINARY_*)',
+                            'hint' => 'Confirme CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no Vercel',
+                            'fiscal' => $fiscal,
                         ], JSON_UNESCAPED_UNICODE);
 
                         return;
                     }
-                } elseif ($pdf && empty($fiscal['recebida_id'])) {
-                    $this->db->rollBack();
-                    http_response_code(500);
-                    echo json_encode(['message' => 'Não foi possível ligar o PDF à compra (módulo fiscal)']);
-
-                    return;
                 }
-                $this->db->commit();
                 echo json_encode(array_merge([
                     'message' => 'Pedido recebido — stock, despesa e compra fiscal registados',
                     'pedido_id' => (int) $id,
