@@ -241,6 +241,33 @@ class FaturacaoService
     }
 
     /**
+     * Encomendas entregues ainda sem fatura emitida (para escolher na UI).
+     */
+    public static function listarEncomendasParaFaturar(PDO $db, int $limite = 80): array
+    {
+        if (!self::tabelasOk($db)) {
+            return [];
+        }
+        $limite = max(1, min(200, $limite));
+        $sql = "SELECT e.encomenda_id, e.total, e.desconto, e.estado,
+                       COALESCE(p.nome, 'Cliente') AS cliente_nome,
+                       COALESCE(NULLIF(TRIM(e.fatura_nif), ''), p.nif) AS cliente_nif,
+                       COALESCE(e.quer_fatura_contribuinte, 0) AS quer_fatura_contribuinte
+                FROM encomendas e
+                LEFT JOIN pessoas p ON p.pessoa_id = e.cliente_id
+                WHERE LOWER(TRIM(e.estado)) = 'entregue'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM faturas_emitidas fe
+                    WHERE fe.encomenda_id = e.encomenda_id AND fe.estado = 'emitida'
+                  )
+                ORDER BY e.encomenda_id DESC
+                LIMIT " . (int) $limite;
+        $stmt = $db->query($sql);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
      * Arquivo unificado (emitidas + recebidas) com filtros.
      */
     public static function listarArquivo(

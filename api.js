@@ -392,6 +392,35 @@ const API = {
         return apiRequest(`pedidos_ingrediente/${id}`, 'PUT', data);
     },
 
+    async updatePedidoIngredienteRecebido(id, data, pdfFile) {
+        if (!pdfFile) {
+            return this.updatePedidoIngrediente(id, data);
+        }
+        const url = `${API_BASE_URL}/pedidos_ingrediente/${id}`;
+        const fd = new FormData();
+        Object.keys(data).forEach((k) => {
+            if (data[k] != null && data[k] !== '') fd.append(k, String(data[k]));
+        });
+        fd.append('documento', pdfFile);
+        const headers = { Accept: 'application/json' };
+        const sessionId = localStorage.getItem('apiSessionId');
+        const token = localStorage.getItem('adminToken') || sessionId;
+        if (sessionId) headers['X-Session-ID'] = sessionId;
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const response = await fetch(url, { method: 'PUT', headers, body: fd });
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Resposta inválida do servidor');
+        }
+        if (!response.ok) {
+            throw new Error(result.message || 'Erro ao receber pedido');
+        }
+        return result;
+    },
+
     async getFinancasResumo(de, ate) {
         return apiRequest(`financas?de=${encodeURIComponent(de)}&ate=${encodeURIComponent(ate)}&view=resumo`);
     },
@@ -450,6 +479,10 @@ const API = {
 
     async deleteFornecedor(id) {
         return apiRequest(`fornecedores/${id}`, 'DELETE');
+    },
+
+    async getFaturacaoEncomendasPendentes() {
+        return apiRequest('faturacao?view=encomendas-pendentes');
     },
 
     async getFaturacaoEmitidas(de, ate, estado) {

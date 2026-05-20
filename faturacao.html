@@ -28,7 +28,7 @@
                     <button type="button" class="sidebar-toggle btn btn-secondary" aria-expanded="false" aria-controls="admin-sidebar" title="Menu">☰</button>
                     <div>
                         <h2>Faturação e IVA</h2>
-                        <p class="header-subtitle">Faturas a clientes, documentos de fornecedor e resumo de IVA.</p>
+                        <p class="header-subtitle">Compras (fornecedores), emitir faturas a clientes e resumo de IVA.</p>
                     </div>
                 </div>
                 <div class="header-actions">
@@ -37,11 +37,6 @@
             </header>
 
             <div class="page-content-stack">
-                <p class="page-intro">
-                    Os preços que o cliente paga <strong>já incluem IVA</strong>. Na fatura, o sistema calcula a base e o IVA a partir desse total. Regista também documentos de fornecedor e consulta o resumo de IVA.
-                    <span class="muted">Exportação AT é informativa (CSV) — confirme com o contabilista antes de submeter à Autoridade Tributária.</span>
-                </p>
-
                 <div id="fatMigrateBanner" class="alert-banner hidden-banner"></div>
                 <div id="fatPdfBanner" class="alert-banner alert-banner--info hidden-banner"></div>
 
@@ -53,52 +48,18 @@
                 </div>
 
                 <nav class="tabs-nav" id="fatTabs" aria-label="Secções de faturação">
-                    <button type="button" class="tab-btn active" data-tab="emitidas">Faturas emitidas</button>
-                    <button type="button" class="tab-btn" data-tab="recebidas">Faturas recebidas</button>
-                    <button type="button" class="tab-btn" data-tab="arquivo">Arquivo</button>
+                    <button type="button" class="tab-btn active" data-tab="compras">Compras</button>
+                    <button type="button" class="tab-btn" data-tab="emitir">Emitir fatura</button>
+                    <button type="button" class="tab-btn" data-tab="vendas">Faturas a clientes</button>
                     <button type="button" class="tab-btn" data-tab="iva">Resumo IVA</button>
                     <button type="button" class="tab-btn" data-tab="empresa">Dados empresa</button>
                 </nav>
 
-                <section id="panel-emitidas" class="fat-panel fat-panel--active admin-section">
-                    <div class="info-card info-card--narrow">
-                        <h3 class="section-title">Emitir fatura de encomenda</h3>
-                        <div class="form-row-2 form-actions-inline">
-                            <div class="form-group">
-                                <label for="fatEncId">ID encomenda (entregue)</label>
-                                <input type="number" id="fatEncId" min="1" placeholder="ex.: 42">
-                            </div>
-                            <div class="form-group form-actions-inline">
-                                <button type="button" id="fatPreviewBtn" class="btn btn-secondary">Pré-visualizar</button>
-                                <button type="button" id="fatEmitirEncBtn" class="btn btn-primary">Emitir fatura</button>
-                            </div>
-                        </div>
-                        <p id="fatPreviewMsg" class="muted preview-msg"></p>
-                    </div>
-                    <div class="table-wrap">
-                        <table class="orders-table" id="tblEmitidas">
-                            <thead>
-                                <tr>
-                                    <th>Documento</th>
-                                    <th>Data</th>
-                                    <th>Cliente</th>
-                                    <th>NIF</th>
-                                    <th>Base</th>
-                                    <th>IVA</th>
-                                    <th>Total</th>
-                                    <th>Estado</th>
-                                    <th>PDF</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <section id="panel-recebidas" class="fat-panel admin-section">
-                    <h3 class="section-title">Registar fatura / documento recebido</h3>
-                    <div class="info-card info-card--medium">
+                <section id="panel-compras" class="fat-panel fat-panel--active admin-section">
+                    <h3 class="section-title">Compras e documentos de fornecedor</h3>
+                    <p class="muted section-note">Lista de faturas/despesas registadas. Use <strong>Abrir ficheiro</strong> para ver o PDF.</p>
+                    <details class="info-card info-card--medium fat-details-form">
+                        <summary>Registar novo documento</summary>
                         <div class="form-row-2">
                             <div class="form-group">
                                 <label for="recTipo">Tipo</label>
@@ -147,24 +108,20 @@
                             <label><input type="radio" name="recModo" value="sem_iva"> Valor sem IVA (base)</label>
                         </div>
                         <div class="form-group">
-                            <label for="recPdf">PDF do documento (recomendado)</label>
+                            <label for="recPdf">PDF do documento *</label>
                             <input type="file" id="recPdf" accept="application/pdf,.pdf" class="form-select">
-                            <p class="muted form-hint">Máx. 15 MB. Fica arquivado em local seguro no servidor.</p>
                         </div>
-                        <button type="button" id="recAddBtn" class="btn btn-primary">Registar documento</button>
-                    </div>
+                        <button type="button" id="recAddBtn" class="btn btn-primary">Registar compra</button>
+                    </details>
                     <div class="table-wrap">
                         <table class="orders-table" id="tblRecebidas">
                             <thead>
                                 <tr>
                                     <th>Data</th>
-                                    <th>Tipo</th>
-                                    <th>Entidade</th>
+                                    <th>Fornecedor / entidade</th>
                                     <th>NIF</th>
-                                    <th>Base</th>
-                                    <th>IVA</th>
                                     <th>Total</th>
-                                    <th>PDF</th>
+                                    <th>Documento</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -173,37 +130,38 @@
                     </div>
                 </section>
 
-                <section id="panel-arquivo" class="fat-panel admin-section">
-                    <p class="muted section-note">Todos os documentos fiscais do período — emitidos e recebidos — com pesquisa e estado do ficheiro arquivado.</p>
-                    <div class="filters-toolbar filters-toolbar--wrap">
-                        <label>Tipo
-                            <select id="arqTipo" class="filter-select">
-                                <option value="">Todos</option>
-                                <option value="emitida">Emitidas</option>
-                                <option value="recebida">Recebidas</option>
-                            </select>
-                        </label>
-                        <label>Ficheiro
-                            <select id="arqFicheiro" class="filter-select">
-                                <option value="">Todos</option>
-                                <option value="1">Com PDF</option>
-                                <option value="0">Sem PDF</option>
-                            </select>
-                        </label>
-                        <label>Pesquisa <input type="search" id="arqQ" class="filter-select" placeholder="referência, cliente, NIF…"></label>
-                        <button type="button" id="arqFiltrarBtn" class="btn btn-secondary">Filtrar arquivo</button>
-                    </div>
+                <section id="panel-emitir" class="fat-panel admin-section">
+                    <h3 class="section-title">Emitir fatura — encomendas entregues</h3>
+                    <p class="muted section-note">Escolha a venda na lista e clique em <strong>Emitir fatura</strong>. O PDF fica arquivado e pode abrir de seguida.</p>
                     <div class="table-wrap">
-                        <table class="orders-table" id="tblArquivo">
+                        <table class="orders-table" id="tblPendentes">
                             <thead>
                                 <tr>
-                                    <th>Tipo</th>
-                                    <th>Referência</th>
-                                    <th>Data</th>
-                                    <th>Entidade</th>
+                                    <th>Encomenda</th>
+                                    <th>Cliente</th>
                                     <th>NIF</th>
                                     <th>Total</th>
-                                    <th>PDF</th>
+                                    <th>Fatura pedida</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="panel-vendas" class="fat-panel admin-section">
+                    <h3 class="section-title">Faturas emitidas a clientes</h3>
+                    <div class="table-wrap">
+                        <table class="orders-table" id="tblEmitidas">
+                            <thead>
+                                <tr>
+                                    <th>Documento</th>
+                                    <th>Data</th>
+                                    <th>Cliente</th>
+                                    <th>Total</th>
+                                    <th>Encomenda</th>
+                                    <th>Documento</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -227,7 +185,7 @@
 
                 <section id="panel-empresa" class="fat-panel admin-section">
                     <div class="info-card info-card--narrow">
-                        <p class="muted">Aparecem nas faturas impressas e no export CSV.</p>
+                        <p class="muted">Aparecem nas faturas e no export CSV.</p>
                         <div class="form-group">
                             <label for="cfgNome">Nome / denominação</label>
                             <input type="text" id="cfgNome" maxlength="120">
@@ -257,17 +215,6 @@
                 </section>
             </div>
         </main>
-    </div>
-
-    <div id="faturaPrintModal" class="modal modal--wide">
-        <div class="modal-content fatura-print-wrap">
-            <span class="close" id="faturaPrintClose">&times;</span>
-            <div id="faturaPrintBody"></div>
-            <div class="form-actions modal-footer-actions">
-                <button type="button" id="faturaPrintBtn" class="btn btn-primary">Imprimir / PDF</button>
-                <button type="button" id="faturaPrintClose2" class="btn btn-secondary">Fechar</button>
-            </div>
-        </div>
     </div>
 
     <script src="api.js"></script>

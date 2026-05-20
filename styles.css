@@ -1870,6 +1870,12 @@ motion {
     gap: 10px;
 }
 
+.fat-details-form summary {
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
 .info-card--narrow {
     max-width: 720px;
 }

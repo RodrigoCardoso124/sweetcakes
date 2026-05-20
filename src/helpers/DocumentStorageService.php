@@ -1,7 +1,9 @@
 <?php
 
+require_once __DIR__ . '/CloudinaryUploadHelper.php';
+
 /**
- * Armazenamento privado de PDFs/documentos fiscais (fora do acesso web directo).
+ * Armazenamento de PDFs/documentos fiscais (Cloudinary em produção/Vercel; disco em local).
  */
 class DocumentStorageService
 {
@@ -64,63 +66,26 @@ class DocumentStorageService
         $tmp = $file['tmp_name'];
         $nomeOriginal = self::sanitizarNome((string) ($file['name'] ?? 'documento.pdf'));
         $mime = self::detectarMime($tmp, (string) ($file['type'] ?? ''));
-        $ext = self::MIME_PERMITIDOS[$mime] ?? 'bin';
         $sha = hash_file('sha256', $tmp);
         $tamanho = (int) filesize($tmp);
 
-        $relDir = date('Y') . '/' . date('m');
-        $absDir = self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relDir);
-        if (!is_dir($absDir)) {
-            mkdir($absDir, 0750, true);
+        $caminho = self::guardarBinarioFisico($tmp, $mime, $nomeOriginal, $tipoDocumento, $documentoId, $origem);
+        if (!empty($caminho['error'])) {
+            return $caminho;
         }
 
-        $baseName = $tipoDocumento . '_' . $documentoId . '_' . $origem . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-        $relPath = $relDir . '/' . $baseName;
-        $absPath = self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relPath);
-
-        if (!move_uploaded_file($tmp, $absPath) && !rename($tmp, $absPath)) {
-            return ['error' => 'Não foi possível guardar o ficheiro', 'code' => 500];
-        }
-
-        try {
-            $db->beginTransaction();
-            self::removerPorDocumento($db, $tipoDocumento, $documentoId, $origem, false);
-            $stmt = $db->prepare(
-                'INSERT INTO documento_ficheiros
-                (tipo_documento, documento_id, nome_original, caminho_relativo, sha256, mime_type,
-                 tamanho_bytes, origem, criado_por)
-                VALUES (?,?,?,?,?,?,?,?,?)'
-            );
-            $stmt->execute([
-                $tipoDocumento,
-                $documentoId,
-                $nomeOriginal,
-                $relPath,
-                $sha,
-                $mime,
-                $tamanho,
-                $origem,
-                $criadoPor,
-            ]);
-            $ficheiroId = (int) $db->lastInsertId();
-            self::ligarDocumento($db, $tipoDocumento, $documentoId, $ficheiroId);
-            $db->commit();
-
-            return [
-                'ficheiro_id' => $ficheiroId,
-                'nome_original' => $nomeOriginal,
-                'mime_type' => $mime,
-                'tamanho_bytes' => $tamanho,
-                'sha256' => $sha,
-            ];
-        } catch (Throwable $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
-            @unlink($absPath);
-
-            return ['error' => $e->getMessage(), 'code' => 500];
-        }
+        return self::registarNaBd(
+            $db,
+            $tipoDocumento,
+            $documentoId,
+            $nomeOriginal,
+            $caminho['path'],
+            $sha,
+            $mime,
+            $tamanho,
+            $origem,
+            $criadoPor
+        );
     }
 
     /**
@@ -148,23 +113,136 @@ class DocumentStorageService
             return ['error' => 'Ficheiro demasiado grande', 'code' => 400];
         }
 
-        $ext = self::MIME_PERMITIDOS[$mime];
-        $relDir = date('Y') . '/' . date('m');
-        $absDir = self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relDir);
-        if (!is_dir($absDir)) {
-            mkdir($absDir, 0750, true);
-        }
-        $baseName = $tipoDocumento . '_' . $documentoId . '_' . $origem . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
-        $relPath = $relDir . '/' . $baseName;
-        $absPath = self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relPath);
-        if (file_put_contents($absPath, $conteudo) === false) {
-            return ['error' => 'Erro ao gravar ficheiro', 'code' => 500];
-        }
-
         $sha = hash('sha256', $conteudo);
         $tamanho = strlen($conteudo);
         $nomeOriginal = self::sanitizarNome($nomeOriginal);
 
+        $caminho = self::guardarBytes($conteudo, $mime, $nomeOriginal, $tipoDocumento, $documentoId, $origem);
+        if (!empty($caminho['error'])) {
+            return $caminho;
+        }
+
+        return self::registarNaBd(
+            $db,
+            $tipoDocumento,
+            $documentoId,
+            $nomeOriginal,
+            $caminho['path'],
+            $sha,
+            $mime,
+            $tamanho,
+            $origem,
+            $criadoPor
+        );
+    }
+
+    /**
+     * @return array{path: string}|array{error: string, code?: int}
+     */
+    private static function guardarBytes(
+        string $bytes,
+        string $mime,
+        string $nomeOriginal,
+        string $tipoDocumento,
+        int $documentoId,
+        string $origem
+    ): array {
+        if (self::preferirCloudinary()) {
+            $err = null;
+            $url = CloudinaryUploadHelper::uploadRawBytes($bytes, $mime, $nomeOriginal, $err);
+            if ($url) {
+                return ['path' => $url];
+            }
+            if (!empty(getenv('VERCEL'))) {
+                return [
+                    'error' => $err ?: 'Configure Cloudinary no Vercel (CLOUDINARY_*) para arquivar PDFs',
+                    'code' => 500,
+                ];
+            }
+        }
+
+        return self::guardarBytesEmDisco($bytes, $mime, $tipoDocumento, $documentoId, $origem);
+    }
+
+    /**
+     * @return array{path: string}|array{error: string, code?: int}
+     */
+    private static function guardarBinarioFisico(
+        string $tmpPath,
+        string $mime,
+        string $nomeOriginal,
+        string $tipoDocumento,
+        int $documentoId,
+        string $origem
+    ): array {
+        if (self::preferirCloudinary()) {
+            $err = null;
+            $url = CloudinaryUploadHelper::uploadRawFile($tmpPath, $mime, $nomeOriginal, $err);
+            if ($url) {
+                return ['path' => $url];
+            }
+            if (!empty(getenv('VERCEL'))) {
+                return [
+                    'error' => $err ?: 'Configure Cloudinary no Vercel (CLOUDINARY_*) para arquivar PDFs',
+                    'code' => 500,
+                ];
+            }
+        }
+
+        $bytes = file_get_contents($tmpPath);
+        if ($bytes === false) {
+            return ['error' => 'Não foi possível ler o ficheiro', 'code' => 500];
+        }
+
+        return self::guardarBytesEmDisco($bytes, $mime, $tipoDocumento, $documentoId, $origem);
+    }
+
+    /**
+     * @return array{path: string}|array{error: string, code?: int}
+     */
+    private static function guardarBytesEmDisco(
+        string $bytes,
+        string $mime,
+        string $tipoDocumento,
+        int $documentoId,
+        string $origem
+    ): array {
+        $ext = self::MIME_PERMITIDOS[$mime] ?? 'bin';
+        $relDir = date('Y') . '/' . date('m');
+        $absDir = self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relDir);
+        if (!is_dir($absDir) && !@mkdir($absDir, 0750, true)) {
+            return ['error' => 'Não foi possível criar pasta de arquivo', 'code' => 500];
+        }
+        $baseName = $tipoDocumento . '_' . $documentoId . '_' . $origem . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
+        $relPath = $relDir . '/' . $baseName;
+        $absPath = self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relPath);
+        if (@file_put_contents($absPath, $bytes) === false) {
+            return ['error' => 'Erro ao gravar ficheiro no servidor', 'code' => 500];
+        }
+
+        return ['path' => $relPath];
+    }
+
+    private static function preferirCloudinary(): bool
+    {
+        return CloudinaryUploadHelper::isEnabled();
+    }
+
+    /**
+     * @return array{ficheiro_id: int, nome_original: string, mime_type: string, tamanho_bytes: int, url_abrir?: string}|array{error: string, code?: int}
+     */
+    private static function registarNaBd(
+        PDO $db,
+        string $tipoDocumento,
+        int $documentoId,
+        string $nomeOriginal,
+        string $caminho,
+        string $sha,
+        string $mime,
+        int $tamanho,
+        string $origem,
+        ?int $criadoPor
+    ): array {
         try {
             $db->beginTransaction();
             self::removerPorDocumento($db, $tipoDocumento, $documentoId, $origem, false);
@@ -178,7 +256,7 @@ class DocumentStorageService
                 $tipoDocumento,
                 $documentoId,
                 $nomeOriginal,
-                $relPath,
+                $caminho,
                 $sha,
                 $mime,
                 $tamanho,
@@ -188,18 +266,22 @@ class DocumentStorageService
             $ficheiroId = (int) $db->lastInsertId();
             self::ligarDocumento($db, $tipoDocumento, $documentoId, $ficheiroId);
             $db->commit();
-
-            return [
+            $out = [
                 'ficheiro_id' => $ficheiroId,
                 'nome_original' => $nomeOriginal,
                 'mime_type' => $mime,
                 'tamanho_bytes' => $tamanho,
+                'sha256' => $sha,
             ];
+            if (CloudinaryUploadHelper::isUrlArmazenamento($caminho)) {
+                $out['url_abrir'] = $caminho;
+            }
+
+            return $out;
         } catch (Throwable $e) {
             if ($db->inTransaction()) {
                 $db->rollBack();
             }
-            @unlink($absPath);
 
             return ['error' => $e->getMessage(), 'code' => 500];
         }
@@ -220,8 +302,24 @@ class DocumentStorageService
     public static function caminhoAbsoluto(array $row): string
     {
         $rel = str_replace(['..', '\\'], ['', '/'], (string) ($row['caminho_relativo'] ?? ''));
+        if (CloudinaryUploadHelper::isUrlArmazenamento($rel)) {
+            return $rel;
+        }
 
         return self::storageRoot() . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
+    }
+
+    public static function urlAbrir(?array $row): ?string
+    {
+        if (!$row) {
+            return null;
+        }
+        $c = (string) ($row['caminho_relativo'] ?? '');
+        if (CloudinaryUploadHelper::isUrlArmazenamento($c)) {
+            return $c;
+        }
+
+        return null;
     }
 
     public static function enviarDownload(PDO $db, int $ficheiroId, bool $inline = false): void
@@ -234,11 +332,16 @@ class DocumentStorageService
 
             return;
         }
+        $url = self::urlAbrir($row);
+        if ($url !== null) {
+            header('Location: ' . $url, true, 302);
+            exit;
+        }
         $path = self::caminhoAbsoluto($row);
         if (!is_file($path) || !is_readable($path)) {
             http_response_code(404);
             header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['message' => 'Ficheiro em falta no disco']);
+            echo json_encode(['message' => 'Ficheiro em falta no servidor']);
 
             return;
         }
@@ -274,7 +377,7 @@ class DocumentStorageService
         }
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $stmt = $db->prepare(
-            "SELECT documento_id, ficheiro_id, nome_original, mime_type, tamanho_bytes, origem, criado_em
+            "SELECT documento_id, ficheiro_id, nome_original, mime_type, tamanho_bytes, origem, criado_em, caminho_relativo
              FROM documento_ficheiros
              WHERE tipo_documento = ? AND documento_id IN ($placeholders)"
         );
@@ -294,6 +397,7 @@ class DocumentStorageService
             $r['ficheiro'] = $map[$did] ?? null;
             if (isset($map[$did])) {
                 $r['ficheiro_id'] = (int) $map[$did]['ficheiro_id'];
+                $r['url_abrir'] = self::urlAbrir($map[$did]);
             }
         }
         unset($r);

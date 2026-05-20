@@ -65,6 +65,12 @@ class FaturacaoController
                 ], JSON_UNESCAPED_UNICODE);
                 break;
 
+            case 'encomendas-pendentes':
+                echo json_encode([
+                    'encomendas' => FaturacaoService::listarEncomendasParaFaturar($this->db),
+                ], JSON_UNESCAPED_UNICODE);
+                break;
+
             case 'recebidas':
                 echo json_encode([
                     'periodo' => ['de' => $de, 'ate' => $ate],
@@ -77,9 +83,11 @@ class FaturacaoController
                 break;
 
             case 'config':
+                require_once __DIR__ . '/../helpers/CloudinaryUploadHelper.php';
                 echo json_encode([
                     'config' => FaturacaoService::getConfig($this->db),
                     'pdf_disponivel' => file_exists(dirname(__DIR__, 2) . '/vendor/autoload.php'),
+                    'cloudinary_ativo' => CloudinaryUploadHelper::isEnabled(),
                 ], JSON_UNESCAPED_UNICODE);
                 break;
 
@@ -185,9 +193,15 @@ class FaturacaoController
 
                 return;
             }
-            $this->anexarFicheiroSeEnviado('recebida', (int) $res['recebida_id'], $files, $data);
+            $arq = $this->anexarFicheiroSeEnviado('recebida', (int) $res['recebida_id'], $files, $data);
+            if (!empty($arq['error'])) {
+                http_response_code($arq['code'] ?? 500);
+                echo json_encode(['message' => $arq['error'], 'recebida_id' => $res['recebida_id']], JSON_UNESCAPED_UNICODE);
+
+                return;
+            }
             http_response_code(201);
-            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            echo json_encode(array_merge($res, $arq), JSON_UNESCAPED_UNICODE);
 
             return;
         }
@@ -287,13 +301,14 @@ class FaturacaoController
         echo json_encode(array_merge(['message' => 'Ficheiro arquivado'], $res), JSON_UNESCAPED_UNICODE);
     }
 
-    private function anexarFicheiroSeEnviado(string $tipo, int $docId, $files, array $data): void
+    private function anexarFicheiroSeEnviado(string $tipo, int $docId, $files, array $data): array
     {
         $file = $this->extrairFicheiro($files);
         if (!$file) {
-            return;
+            return [];
         }
-        DocumentStorageService::guardarUpload(
+
+        return DocumentStorageService::guardarUpload(
             $this->db,
             $tipo,
             $docId,

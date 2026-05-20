@@ -227,6 +227,25 @@ async function savePed() {
   }
 }
 
+function abrirFaturaPedido(p) {
+  const url = p.url_abrir;
+  const fid = p.ficheiro_id;
+  if (url) {
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+  if (fid && typeof API.downloadFaturacaoFicheiro === 'function') {
+    API.downloadFaturacaoFicheiro(fid, true)
+      .then((r) => {
+        window.open(r.url, '_blank', 'noopener');
+        setTimeout(() => URL.revokeObjectURL(r.url), 60000);
+      })
+      .catch((e) => showToast(e.message, 'warning'));
+    return;
+  }
+  showToast('Sem PDF arquivado para este pedido', 'warning');
+}
+
 function renderPed(list) {
   const tb = document.querySelector('#tblPed tbody');
   tb.innerHTML = list
@@ -235,6 +254,22 @@ function renderPed(list) {
         p.estado === 'recebido' && p.valor_total != null && parseFloat(p.valor_total) > 0
           ? fmtEuro(p.valor_total)
           : '—';
+      let faturaCell = '—';
+      if (p.estado === 'recebido') {
+        if (p.tem_ficheiro) {
+          faturaCell =
+            '<button type="button" class="btn btn-primary btn-sm" data-abrir-fat="' +
+            p.pedido_id +
+            '">Abrir fatura</button>';
+          if (p.num_fatura) {
+            faturaCell += ' <span class="muted">' + escapeHtml(p.num_fatura) + '</span>';
+          }
+        } else {
+          faturaCell =
+            '<span class="muted">Sem PDF</span>' +
+            (p.num_fatura ? ' · ' + escapeHtml(p.num_fatura) : '');
+        }
+      }
       return (
         '<tr><td>' +
         p.pedido_id +
@@ -248,6 +283,8 @@ function renderPed(list) {
         escapeHtml(p.estado) +
         '</td><td>' +
         totalCell +
+        '</td><td>' +
+        faturaCell +
         '</td><td>' +
         escapeHtml((p.criado_em || '').substring(0, 16)) +
         '</td><td>' +
@@ -274,9 +311,17 @@ function renderPed(list) {
         : '';
       document.getElementById('recValorTotal').value = '';
       document.getElementById('recFatura').value = '';
+      const pdfEl = document.getElementById('recPdf');
+      if (pdfEl) pdfEl.value = '';
       document.getElementById('recModal').classList.add('active');
     })
   );
+  tb.querySelectorAll('[data-abrir-fat]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const ped = list.find((x) => String(x.pedido_id) === b.getAttribute('data-abrir-fat'));
+      if (ped) abrirFaturaPedido(ped);
+    });
+  });
   tb.querySelectorAll('[data-can]').forEach((b) =>
     b.addEventListener('click', async () => {
       if (!confirm('Cancelar este pedido?')) return;
@@ -295,15 +340,27 @@ async function saveRec() {
   const id = document.getElementById('recPedId').value;
   const vt = parseFloat(document.getElementById('recValorTotal').value);
   const num_fatura = document.getElementById('recFatura').value.trim();
+  const pdfInput = document.getElementById('recPdf');
+  const pdfFile = pdfInput && pdfInput.files && pdfInput.files[0] ? pdfInput.files[0] : null;
   if (Number.isNaN(vt) || vt <= 0) {
     showToast('Indique o valor total pago (€)', 'warning');
+    return;
+  }
+  if (!pdfFile) {
+    showToast('Anexe o PDF da fatura do fornecedor', 'warning');
     return;
   }
   const payload = { estado: 'recebido', valor_total: vt };
   if (num_fatura) payload.num_fatura = num_fatura;
   try {
-    await API.updatePedidoIngrediente(id, payload);
-    showToast('Pedido recebido — stock e despesa registados', 'success');
+    const res = await API.updatePedidoIngredienteRecebido(id, payload, pdfFile);
+    showToast('Pedido recebido — compra e PDF arquivados', 'success');
+    if (res.url_abrir) {
+      window.open(res.url_abrir, '_blank', 'noopener');
+    } else if (res.ficheiro_id && typeof API.downloadFaturacaoFicheiro === 'function') {
+      const dl = await API.downloadFaturacaoFicheiro(res.ficheiro_id, true);
+      window.open(dl.url, '_blank', 'noopener');
+    }
     document.querySelector('#recModal .modal-actions').style.display = 'none';
     document.getElementById('recLucroWrap').style.display = 'block';
     await load();

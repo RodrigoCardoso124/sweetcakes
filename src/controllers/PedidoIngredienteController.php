@@ -8,6 +8,74 @@ require_once __DIR__ . '/../helpers/LucroCalculator.php';
 
 class PedidoIngredienteController
 {
+    private static function anexarFiscalAosPedidos(PDO $db, array $list): array
+    {
+        if (!$list || !LucroCalculator::tableExists($db, 'faturas_recebidas')) {
+            return $list;
+        }
+        $pids = [];
+        foreach ($list as $p) {
+            if (($p['estado'] ?? '') === 'recebido') {
+                $pids[] = (int) $p['pedido_id'];
+            }
+        }
+        if (!$pids) {
+            return $list;
+        }
+        $placeholders = implode(',', array_fill(0, count($pids), '?'));
+        $stmt = $db->prepare(
+            "SELECT * FROM faturas_recebidas WHERE pedido_id IN ($placeholders)"
+        );
+        $stmt->execute($pids);
+        $recs = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!$recs) {
+            return $list;
+        }
+        if (file_exists(__DIR__ . '/../helpers/DocumentStorageService.php')) {
+            require_once __DIR__ . '/../helpers/DocumentStorageService.php';
+            $recs = DocumentStorageService::anexarMetadados($db, 'recebida', $recs);
+        }
+        $map = [];
+        foreach ($recs as $r) {
+            $map[(int) $r['pedido_id']] = $r;
+        }
+        foreach ($list as &$p) {
+            $pid = (int) ($p['pedido_id'] ?? 0);
+            if (!isset($map[$pid])) {
+                continue;
+            }
+            $r = $map[$pid];
+            $p['recebida_id'] = (int) $r['recebida_id'];
+            $p['tem_ficheiro'] = !empty($r['tem_ficheiro']);
+            $p['ficheiro_id'] = $r['ficheiro_id'] ?? null;
+            $p['url_abrir'] = $r['url_abrir'] ?? null;
+            if (!empty($r['numero']) && empty($p['num_fatura'])) {
+                $p['num_fatura'] = $r['numero'];
+            }
+        }
+        unset($p);
+
+        return $list;
+    }
+
+    private function extrairPdfRececao($files): ?array
+    {
+        if (!is_array($files)) {
+            return null;
+        }
+        if (!empty($files['documento']) && is_array($files['documento'])) {
+            return $files['documento'];
+        }
+        if (!empty($files['documento_pdf']) && is_array($files['documento_pdf'])) {
+            return $files['documento_pdf'];
+        }
+        if (!empty($files['fatura_pdf']) && is_array($files['fatura_pdf'])) {
+            return $files['fatura_pdf'];
+        }
+
+        return null;
+    }
+
     private $db;
     private $pedido;
     private $ingrediente;
@@ -25,7 +93,8 @@ class PedidoIngredienteController
         if ($estado === '') {
             $estado = null;
         }
-        echo json_encode($this->pedido->listAll($estado), JSON_UNESCAPED_UNICODE);
+        $list = $this->pedido->listAll($estado);
+        echo json_encode(self::anexarFiscalAosPedidos($this->db, $list), JSON_UNESCAPED_UNICODE);
     }
 
     public function show($id)
@@ -104,7 +173,7 @@ class PedidoIngredienteController
         ], JSON_UNESCAPED_UNICODE);
     }
 
-    public function update($id, $data)
+    public function update($id, $data, $files = null)
     {
         if (!is_array($data)) {
             $data = [];
@@ -143,10 +212,49 @@ class PedidoIngredienteController
                 $nf = isset($data['num_fatura']) ? trim((string) $data['num_fatura']) : null;
                 $dr = isset($data['data_recebido']) ? LucroCalculator::parseData($data['data_recebido'], date('Y-m-d')) : date('Y-m-d');
                 $this->pedido->marcarRecebido((int) $id, $vt, $nf, $dr);
+                $fiscal = ['skipped' => true];
                 if (file_exists(__DIR__ . '/../helpers/FaturacaoIntegracaoService.php')) {
                     require_once __DIR__ . '/../helpers/FaturacaoIntegracaoService.php';
-                    FaturacaoIntegracaoService::sincronizarPedidoRecebido($this->db, (int) $id);
+                    $fiscal = FaturacaoIntegracaoService::sincronizarPedidoRecebido($this->db, (int) $id);
                 }
+                $pdf = $this->extrairPdfRececao($files);
+                $arquivo = [];
+                if ($pdf && !empty($fiscal['recebida_id'])) {
+                    require_once __DIR__ . '/../helpers/DocumentStorageService.php';
+                    $arquivo = DocumentStorageService::guardarUpload(
+                        $this->db,
+                        'recebida',
+                        (int) $fiscal['recebida_id'],
+                        $pdf,
+                        'upload',
+                        Auth::pessoaId()
+                    );
+                    if (!empty($arquivo['error'])) {
+                        $this->db->rollBack();
+                        http_response_code($arquivo['code'] ?? 500);
+                        echo json_encode([
+                            'message' => $arquivo['error'],
+                            'hint' => 'Confirme Cloudinary no Vercel (CLOUDINARY_*)',
+                        ], JSON_UNESCAPED_UNICODE);
+
+                        return;
+                    }
+                } elseif ($pdf && empty($fiscal['recebida_id'])) {
+                    $this->db->rollBack();
+                    http_response_code(500);
+                    echo json_encode(['message' => 'Não foi possível ligar o PDF à compra (módulo fiscal)']);
+
+                    return;
+                }
+                $this->db->commit();
+                echo json_encode(array_merge([
+                    'message' => 'Pedido recebido — stock, despesa e compra fiscal registados',
+                    'pedido_id' => (int) $id,
+                    'estado' => $estado,
+                    'fiscal' => $fiscal,
+                ], $arquivo), JSON_UNESCAPED_UNICODE);
+
+                return;
             } else {
                 $this->pedido->setEstado((int) $id, $estado);
             }
