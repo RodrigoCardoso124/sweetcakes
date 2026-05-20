@@ -181,7 +181,18 @@ class CloudinaryUploadHelper
                 return null;
             }
             $timestamp = time();
-            $signature = sha1('folder=' . $folder . '&timestamp=' . $timestamp . $apiSecret);
+            $signParams = [
+                'access_mode' => 'public',
+                'folder' => $folder,
+                'timestamp' => (string) $timestamp,
+            ];
+            ksort($signParams);
+            $pairs = [];
+            foreach ($signParams as $k => $v) {
+                $pairs[] = $k . '=' . $v;
+            }
+            $signature = sha1(implode('&', $pairs) . $apiSecret);
+            $postFields['access_mode'] = 'public';
             $postFields['api_key'] = $apiKey;
             $postFields['timestamp'] = $timestamp;
             $postFields['signature'] = $signature;
@@ -258,7 +269,30 @@ class CloudinaryUploadHelper
     }
 
     /**
-     * Obtém bytes do PDF: CDN público (como imagens) → fallback API com Basic Auth (PDFs antigos/privados).
+     * Assinatura API v1 (igual ao upload) para /raw/download.
+     *
+     * @return array<string, string>
+     */
+    private static function signApiParams(array $params, string $apiSecret): array
+    {
+        $filtered = [];
+        foreach ($params as $k => $v) {
+            if ($v !== null && $v !== '') {
+                $filtered[(string) $k] = (string) $v;
+            }
+        }
+        ksort($filtered);
+        $parts = [];
+        foreach ($filtered as $k => $v) {
+            $parts[] = $k . '=' . $v;
+        }
+        $filtered['signature'] = sha1(implode('&', $parts) . $apiSecret);
+
+        return $filtered;
+    }
+
+    /**
+     * Obtém bytes do PDF: CDN → API /raw/download assinada (PDFs privados/antigos).
      */
     public static function fetchUrlBytes(string $secureUrl, ?string &$error = null): ?string
     {
@@ -268,33 +302,42 @@ class CloudinaryUploadHelper
             return null;
         }
 
-        $url = self::normalizeDeliveryUrl($secureUrl);
-        $body = self::httpGet($url, false, $code, $curlErr);
-        if (self::isPdfBody($body)) {
-            return $body;
+        $lastErr = null;
+        foreach (array_unique([$secureUrl, self::normalizeDeliveryUrl($secureUrl)]) as $cdnUrl) {
+            $body = self::httpGet($cdnUrl, false, $code, $curlErr);
+            if (self::isPdfBody($body)) {
+                return $body;
+            }
+            $lastErr = self::extractHttpError($body, $code, $curlErr);
         }
 
-        $parsed = self::parseDeliveryUrl($secureUrl) ?? self::parseDeliveryUrl($url);
+        $parsed = self::parseDeliveryUrl($secureUrl);
         $cfg = self::loadConfig();
         if ($parsed && !empty($cfg['api_key']) && !empty($cfg['api_secret'])) {
-            $apiBody = self::fetchViaApiDownload($parsed, $cfg, $code, $curlErr);
+            $apiBody = self::fetchViaApiDownload($parsed, $cfg, $apiErr);
             if (self::isPdfBody($apiBody)) {
                 return $apiBody;
             }
+            if ($apiErr) {
+                $lastErr = $apiErr;
+            }
         }
 
+        $error = $lastErr ?: 'Não foi possível obter o PDF do Cloudinary';
+
+        return null;
+    }
+
+    private static function extractHttpError(?string $body, int $code, ?string $curlErr): string
+    {
         if (is_string($body)) {
             $decoded = json_decode($body, true);
             if (is_array($decoded) && !empty($decoded['error']['message'])) {
-                $error = (string) $decoded['error']['message'];
-            } else {
-                $error = 'Cloudinary HTTP ' . $code . ($curlErr ? ' — ' . $curlErr : '');
+                return (string) $decoded['error']['message'];
             }
-        } else {
-            $error = $curlErr ?: ('Cloudinary HTTP ' . $code);
         }
 
-        return null;
+        return 'Cloudinary HTTP ' . $code . ($curlErr ? ' — ' . $curlErr : '');
     }
 
     private static function isPdfBody(?string $body): bool
@@ -331,28 +374,37 @@ class CloudinaryUploadHelper
     /**
      * @param array{cloud: string, resource_type: string, delivery_type: string, version: ?string, public_id: string} $parsed
      */
-    private static function fetchViaApiDownload(array $parsed, array $cfg, ?int &$httpCode, ?string &$curlErr): ?string
+    private static function fetchViaApiDownload(array $parsed, array $cfg, ?string &$errorOut): ?string
     {
         $cloud = $cfg['cloud_name'] ?: $parsed['cloud'];
-        $q = [
-            'public_id' => $parsed['public_id'],
-            'format' => 'pdf',
-        ];
+        $apiSecret = (string) $cfg['api_secret'];
+        $apiKey = (string) $cfg['api_key'];
+        $timestamp = (string) time();
         $types = array_values(array_unique([$parsed['delivery_type'], 'upload', 'authenticated']));
+        $lastErr = null;
+
         foreach ($types as $type) {
-            $q['type'] = $type;
+            $params = [
+                'format' => 'pdf',
+                'public_id' => $parsed['public_id'],
+                'timestamp' => $timestamp,
+                'type' => $type,
+            ];
             if (!empty($parsed['version'])) {
-                $q['version'] = $parsed['version'];
-            } else {
-                unset($q['version']);
+                $params['version'] = $parsed['version'];
             }
+            $signed = self::signApiParams($params, $apiSecret);
+            $signed['api_key'] = $apiKey;
             $url = 'https://api.cloudinary.com/v1_1/' . $cloud . '/'
-                . $parsed['resource_type'] . '/download?' . http_build_query($q);
-            $body = self::httpGet($url, true, $httpCode, $curlErr);
+                . $parsed['resource_type'] . '/download?' . http_build_query($signed);
+            $body = self::httpGet($url, false, $code, $curlErr);
             if (self::isPdfBody($body)) {
                 return $body;
             }
+            $lastErr = self::extractHttpError($body, $code, $curlErr);
         }
+
+        $errorOut = $lastErr;
 
         return null;
     }

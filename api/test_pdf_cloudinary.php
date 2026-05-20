@@ -55,12 +55,16 @@ $out['passos']['upload'] = $url ? ['ok' => true, 'secure_url' => $url] : ['ok' =
 if ($url) {
     $fetchErr = null;
     $bytes = CloudinaryUploadHelper::fetchUrlBytes($url, $fetchErr);
+    $parsed = CloudinaryUploadHelper::parseDeliveryUrl($url);
     $out['passos']['fetch'] = [
         'ok' => $bytes !== null && strncmp($bytes, '%PDF', 4) === 0,
         'bytes' => $bytes !== null ? strlen($bytes) : 0,
         'erro' => $fetchErr,
+        'public_id' => $parsed['public_id'] ?? null,
+        'version' => $parsed['version'] ?? null,
     ];
     $out['passos']['url_normalizada'] = CloudinaryUploadHelper::normalizeDeliveryUrl($url);
+    $out['nota_upload'] = 'Novos PDFs usam access_mode=public. PDFs antigos (antes deste deploy) podem precisar de reenvio.';
 }
 
 $out['ok'] = !empty($out['passos']['upload']['ok']) && !empty($out['passos']['fetch']['ok']);
