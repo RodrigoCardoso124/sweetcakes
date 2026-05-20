@@ -80,13 +80,31 @@ Você pode alterar o estado de uma encomenda para:
 2. **Estatísticas** — secção Lucro (ganhos de encomendas entregues − despesas) e margem por produto
 3. **Despesas** — registo manual; compras ao fornecedor entram ao marcar pedido como Recebido em **Materiais**
 4. **Fornecedores** — cadastro de empresas fornecedoras
-5. **Faturação** (`faturacao.html`) — preços **com IVA incluído**; na fatura calcula-se base + IVA; emitir a partir de encomendas entregues.
+5. **Faturação** (`faturacao.html`) — preços **com IVA incluído**; faturas emitidas com PDF arquivado; documentos de fornecedor; resumo IVA (vendas − compras); separador **Arquivo**.
 
 ### Migrações
 
 - `/api/migrate_009_faturacao.php` — faturas, IVA nas despesas, NIF em clientes
 - `/api/migrate_010_encomenda_fatura.php` — pedido de fatura com contribuinte na encomenda
 - `/api/migrate_011_backfill_nifs.php` — atribui NIF válido a clientes que ainda não têm
+- `/api/migrate_012_documentos.php` — arquivo de PDFs em `storage/faturacao/` (pasta protegida)
+
+### PDF automático (Dompdf)
+
+Na pasta do projeto (onde está `composer.json`):
+
+```bash
+composer install
+```
+
+Sem Composer, as faturas emitidas ficam arquivadas em HTML; pode carregar PDFs manualmente na UI.
+
+### IVA (resumo)
+
+- **IVA debitado** — faturas emitidas a clientes no período
+- **IVA dedutível** — faturas/documentos recebidos (fornecedores, despesas com registo fiscal)
+- **IVA a entregar** ≈ debitado − dedutível (estimativa; confirme com o contabilista)
+- Pedidos de ingrediente **recebidos** e **despesas** novas criam linhas em faturas recebidas automaticamente (sem PDF — carregue o PDF do fornecedor depois)
 
 ### App cliente — fatura na encomenda
 

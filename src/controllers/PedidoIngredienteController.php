@@ -143,6 +143,10 @@ class PedidoIngredienteController
                 $nf = isset($data['num_fatura']) ? trim((string) $data['num_fatura']) : null;
                 $dr = isset($data['data_recebido']) ? LucroCalculator::parseData($data['data_recebido'], date('Y-m-d')) : date('Y-m-d');
                 $this->pedido->marcarRecebido((int) $id, $vt, $nf, $dr);
+                if (file_exists(__DIR__ . '/../helpers/FaturacaoIntegracaoService.php')) {
+                    require_once __DIR__ . '/../helpers/FaturacaoIntegracaoService.php';
+                    FaturacaoIntegracaoService::sincronizarPedidoRecebido($this->db, (int) $id);
+                }
             } else {
                 $this->pedido->setEstado((int) $id, $estado);
             }

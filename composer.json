@@ -1,0 +1,11 @@
+{
+    "name": "sweet-cakes/backend",
+    "description": "Sweet Cakes API — dependências opcionais",
+    "require": {
+        "php": ">=8.0",
+        "dompdf/dompdf": "^2.0"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

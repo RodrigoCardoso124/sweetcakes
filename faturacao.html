@@ -43,6 +43,7 @@
                 </p>
 
                 <div id="fatMigrateBanner" class="alert-banner hidden-banner"></div>
+                <div id="fatPdfBanner" class="alert-banner alert-banner--info hidden-banner"></div>
 
                 <div class="filters-toolbar">
                     <label>De <input type="date" id="fatDe" class="filter-select"></label>
@@ -54,6 +55,7 @@
                 <nav class="tabs-nav" id="fatTabs" aria-label="Secções de faturação">
                     <button type="button" class="tab-btn active" data-tab="emitidas">Faturas emitidas</button>
                     <button type="button" class="tab-btn" data-tab="recebidas">Faturas recebidas</button>
+                    <button type="button" class="tab-btn" data-tab="arquivo">Arquivo</button>
                     <button type="button" class="tab-btn" data-tab="iva">Resumo IVA</button>
                     <button type="button" class="tab-btn" data-tab="empresa">Dados empresa</button>
                 </nav>
@@ -85,6 +87,7 @@
                                     <th>IVA</th>
                                     <th>Total</th>
                                     <th>Estado</th>
+                                    <th>PDF</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -143,6 +146,11 @@
                             <label><input type="radio" name="recModo" value="com_iva" checked> Valor com IVA incluído</label>
                             <label><input type="radio" name="recModo" value="sem_iva"> Valor sem IVA (base)</label>
                         </div>
+                        <div class="form-group">
+                            <label for="recPdf">PDF do documento (recomendado)</label>
+                            <input type="file" id="recPdf" accept="application/pdf,.pdf" class="form-select">
+                            <p class="muted form-hint">Máx. 15 MB. Fica arquivado em local seguro no servidor.</p>
+                        </div>
                         <button type="button" id="recAddBtn" class="btn btn-primary">Registar documento</button>
                     </div>
                     <div class="table-wrap">
@@ -156,6 +164,46 @@
                                     <th>Base</th>
                                     <th>IVA</th>
                                     <th>Total</th>
+                                    <th>PDF</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="panel-arquivo" class="fat-panel admin-section">
+                    <p class="muted section-note">Todos os documentos fiscais do período — emitidos e recebidos — com pesquisa e estado do ficheiro arquivado.</p>
+                    <div class="filters-toolbar filters-toolbar--wrap">
+                        <label>Tipo
+                            <select id="arqTipo" class="filter-select">
+                                <option value="">Todos</option>
+                                <option value="emitida">Emitidas</option>
+                                <option value="recebida">Recebidas</option>
+                            </select>
+                        </label>
+                        <label>Ficheiro
+                            <select id="arqFicheiro" class="filter-select">
+                                <option value="">Todos</option>
+                                <option value="1">Com PDF</option>
+                                <option value="0">Sem PDF</option>
+                            </select>
+                        </label>
+                        <label>Pesquisa <input type="search" id="arqQ" class="filter-select" placeholder="referência, cliente, NIF…"></label>
+                        <button type="button" id="arqFiltrarBtn" class="btn btn-secondary">Filtrar arquivo</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="orders-table" id="tblArquivo">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Referência</th>
+                                    <th>Data</th>
+                                    <th>Entidade</th>
+                                    <th>NIF</th>
+                                    <th>Total</th>
+                                    <th>PDF</th>
                                     <th></th>
                                 </tr>
                             </thead>

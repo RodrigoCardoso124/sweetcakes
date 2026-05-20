@@ -496,8 +496,90 @@ const API = {
         return apiRequest(`faturacao/${id}`, 'PUT', { action: 'anular' });
     },
 
-    async createFaturaRecebida(data) {
-        return apiRequest('faturacao', 'POST', Object.assign({ action: 'recebida' }, data));
+    async getFaturacaoArquivo(de, ate, opts) {
+        opts = opts || {};
+        let q =
+            'faturacao?view=arquivo&de=' +
+            encodeURIComponent(de) +
+            '&ate=' +
+            encodeURIComponent(ate);
+        if (opts.tipo) q += '&tipo=' + encodeURIComponent(opts.tipo);
+        if (opts.q) q += '&q=' + encodeURIComponent(opts.q);
+        if (opts.com_ficheiro === true) q += '&com_ficheiro=1';
+        if (opts.com_ficheiro === false) q += '&com_ficheiro=0';
+        return apiRequest(q);
+    },
+
+    async downloadFaturacaoFicheiro(ficheiroId, inline) {
+        const url =
+            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(ficheiroId))}` +
+            (inline ? '&inline=1' : '');
+        const headers = { Accept: 'application/pdf,*/*' };
+        const sessionId = localStorage.getItem('apiSessionId');
+        const token = localStorage.getItem('adminToken') || sessionId;
+        if (sessionId) headers['X-Session-ID'] = sessionId;
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const response = await fetch(url, { method: 'GET', headers });
+        if (!response.ok) {
+            const text = await response.text();
+            let msg = 'Erro ao descarregar';
+            try {
+                const j = JSON.parse(text);
+                if (j.message) msg = j.message;
+            } catch (e) {
+                /* ignore */
+            }
+            throw new Error(msg);
+        }
+        const blob = await response.blob();
+        const disp = response.headers.get('Content-Disposition') || '';
+        let nome = 'documento.pdf';
+        const m = /filename\*?=(?:UTF-8'')?["']?([^"';]+)/i.exec(disp);
+        if (m && m[1]) nome = decodeURIComponent(m[1].trim());
+        return { blob, nome, url: URL.createObjectURL(blob) };
+    },
+
+    async _faturacaoMultipart(formData) {
+        const url = `${API_BASE_URL}/faturacao`;
+        const headers = { Accept: 'application/json' };
+        const sessionId = localStorage.getItem('apiSessionId');
+        const token = localStorage.getItem('adminToken') || sessionId;
+        if (sessionId) headers['X-Session-ID'] = sessionId;
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const response = await fetch(url, { method: 'POST', headers, body: formData });
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch (e) {
+            throw new Error('Resposta inválida do servidor');
+        }
+        if (!response.ok) {
+            throw new Error(result.message || 'Erro no pedido');
+        }
+        return result;
+    },
+
+    async uploadFaturacaoDocumento(tipoDocumento, documentoId, file) {
+        const fd = new FormData();
+        fd.append('action', 'upload');
+        fd.append('tipo_documento', tipoDocumento);
+        fd.append('documento_id', String(documentoId));
+        fd.append('documento', file);
+        return this._faturacaoMultipart(fd);
+    },
+
+    async createFaturaRecebida(data, pdfFile) {
+        if (!pdfFile) {
+            return apiRequest('faturacao', 'POST', Object.assign({ action: 'recebida' }, data));
+        }
+        const fd = new FormData();
+        fd.append('action', 'recebida');
+        Object.keys(data).forEach((k) => {
+            if (data[k] != null && data[k] !== '') fd.append(k, String(data[k]));
+        });
+        fd.append('documento', pdfFile);
+        return this._faturacaoMultipart(fd);
     },
 
     async deleteFaturaRecebida(id) {

@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/../helpers/FaturacaoService.php';
 require_once __DIR__ . '/../helpers/LucroCalculator.php';
+require_once __DIR__ . '/../helpers/DocumentStorageService.php';
+require_once __DIR__ . '/../helpers/Auth.php';
 
 class FaturacaoController
 {
@@ -34,7 +36,35 @@ class FaturacaoController
             return;
         }
 
+        if ($view === 'download') {
+            $fid = (int) ($_GET['ficheiro_id'] ?? 0);
+            if ($fid <= 0) {
+                http_response_code(400);
+                echo json_encode(['message' => 'ficheiro_id obrigatório']);
+
+                return;
+            }
+            $inline = !empty($_GET['inline']);
+            DocumentStorageService::enviarDownload($this->db, $fid, $inline);
+
+            return;
+        }
+
         switch ($view) {
+            case 'arquivo':
+                $tipo = isset($_GET['tipo']) ? trim((string) $_GET['tipo']) : null;
+                $q = isset($_GET['q']) ? trim((string) $_GET['q']) : null;
+                $cf = null;
+                if (isset($_GET['com_ficheiro']) && $_GET['com_ficheiro'] !== '') {
+                    $cf = $_GET['com_ficheiro'] === '1' || $_GET['com_ficheiro'] === 'true';
+                }
+                echo json_encode([
+                    'periodo' => ['de' => $de, 'ate' => $ate],
+                    'documentos' => FaturacaoService::listarArquivo($this->db, $de, $ate, $tipo, $q, $cf),
+                    'pdf_disponivel' => file_exists(dirname(__DIR__, 2) . '/vendor/autoload.php'),
+                ], JSON_UNESCAPED_UNICODE);
+                break;
+
             case 'recebidas':
                 echo json_encode([
                     'periodo' => ['de' => $de, 'ate' => $ate],
@@ -47,7 +77,10 @@ class FaturacaoController
                 break;
 
             case 'config':
-                echo json_encode(['config' => FaturacaoService::getConfig($this->db)], JSON_UNESCAPED_UNICODE);
+                echo json_encode([
+                    'config' => FaturacaoService::getConfig($this->db),
+                    'pdf_disponivel' => file_exists(dirname(__DIR__, 2) . '/vendor/autoload.php'),
+                ], JSON_UNESCAPED_UNICODE);
                 break;
 
             case 'export-at':
@@ -66,7 +99,7 @@ class FaturacaoController
                     return;
                 }
                 $cfg = FaturacaoService::getConfig($this->db);
-                $taxa = (float) ($cfg['taxa_iva_padrao'] ?? IvaHelper::TAXA_PADRAO);
+                $taxa = (float) ($cfg['taxa_iva_padrao'] ?? 23);
                 if (isset($_GET['taxa_iva_pct'])) {
                     $taxa = (float) $_GET['taxa_iva_pct'];
                 }
@@ -114,8 +147,18 @@ class FaturacaoController
         echo json_encode($f, JSON_UNESCAPED_UNICODE);
     }
 
-    public function store($data)
+    /**
+     * @param array|null $files $_FILES quando multipart
+     */
+    public function store($data, $files = null)
     {
+        if (!is_array($data)) {
+            $data = [];
+        }
+        if (!empty($_POST) && empty($data['action'])) {
+            $data = array_merge($data, $_POST);
+        }
+
         $action = trim((string) ($data['action'] ?? 'emitir'));
 
         if ($action === 'config') {
@@ -128,6 +171,12 @@ class FaturacaoController
             return;
         }
 
+        if ($action === 'upload') {
+            $this->handleUpload($data, $files);
+
+            return;
+        }
+
         if ($action === 'recebida') {
             $res = FaturacaoService::criarRecebida($this->db, $data);
             if (!empty($res['error'])) {
@@ -136,6 +185,7 @@ class FaturacaoController
 
                 return;
             }
+            $this->anexarFicheiroSeEnviado('recebida', (int) $res['recebida_id'], $files, $data);
             http_response_code(201);
             echo json_encode($res, JSON_UNESCAPED_UNICODE);
 
@@ -199,5 +249,72 @@ class FaturacaoController
             return;
         }
         echo json_encode(['message' => 'Documento removido'], JSON_UNESCAPED_UNICODE);
+    }
+
+    private function handleUpload(?array $data, $files): void
+    {
+        $data = is_array($data) ? $data : [];
+        $tipo = trim((string) ($data['tipo_documento'] ?? ''));
+        $docId = (int) ($data['documento_id'] ?? 0);
+        if (!in_array($tipo, ['emitida', 'recebida'], true) || $docId <= 0) {
+            http_response_code(400);
+            echo json_encode(['message' => 'tipo_documento e documento_id são obrigatórios']);
+
+            return;
+        }
+        $file = $this->extrairFicheiro($files);
+        if (!$file) {
+            http_response_code(400);
+            echo json_encode(['message' => 'Envie o ficheiro no campo documento (PDF)']);
+
+            return;
+        }
+        $pessoaId = Auth::pessoaId();
+        $res = DocumentStorageService::guardarUpload(
+            $this->db,
+            $tipo,
+            $docId,
+            $file,
+            'upload',
+            $pessoaId
+        );
+        if (!empty($res['error'])) {
+            http_response_code($res['code'] ?? 400);
+            echo json_encode(['message' => $res['error']], JSON_UNESCAPED_UNICODE);
+
+            return;
+        }
+        echo json_encode(array_merge(['message' => 'Ficheiro arquivado'], $res), JSON_UNESCAPED_UNICODE);
+    }
+
+    private function anexarFicheiroSeEnviado(string $tipo, int $docId, $files, array $data): void
+    {
+        $file = $this->extrairFicheiro($files);
+        if (!$file) {
+            return;
+        }
+        DocumentStorageService::guardarUpload(
+            $this->db,
+            $tipo,
+            $docId,
+            $file,
+            'upload',
+            Auth::pessoaId()
+        );
+    }
+
+    private function extrairFicheiro($files): ?array
+    {
+        if (!is_array($files)) {
+            return null;
+        }
+        if (!empty($files['documento']) && is_array($files['documento'])) {
+            return $files['documento'];
+        }
+        if (!empty($files['documento_pdf'])) {
+            return $files['documento_pdf'];
+        }
+
+        return null;
     }
 }

@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('fatPreviewBtn').addEventListener('click', previewEnc);
   document.getElementById('fatEmitirEncBtn').addEventListener('click', emitirEnc);
   document.getElementById('recAddBtn').addEventListener('click', addRecebida);
+  document.getElementById('arqFiltrarBtn').addEventListener('click', loadArquivo);
   document.getElementById('cfgSaveBtn').addEventListener('click', saveConfig);
   document.getElementById('faturaPrintBtn').addEventListener('click', () => window.print());
   document.getElementById('faturaPrintClose').addEventListener('click', closePrint);
@@ -78,18 +79,106 @@ async function loadConfig() {
   }
 }
 
+function pdfBadge(tem) {
+  return tem
+    ? '<span class="badge badge--ok">Arquivado</span>'
+    : '<span class="badge badge--muted">Sem ficheiro</span>';
+}
+
+function botoesPdf(ficheiroId, tem) {
+  if (!tem || !ficheiroId) {
+    return '<span class="muted">—</span>';
+  }
+  return (
+    '<button type="button" class="btn btn-secondary btn-sm" data-pdf-ver="' +
+    ficheiroId +
+    '">Ver</button> ' +
+    '<button type="button" class="btn btn-secondary btn-sm" data-pdf-dl="' +
+    ficheiroId +
+    '">Descarregar</button>'
+  );
+}
+
+function ligarBotoesPdf(root) {
+  if (!root) return;
+  root.querySelectorAll('[data-pdf-ver]').forEach((btn) => {
+    btn.addEventListener('click', () => abrirPdf(btn.getAttribute('data-pdf-ver'), true));
+  });
+  root.querySelectorAll('[data-pdf-dl]').forEach((btn) => {
+    btn.addEventListener('click', () => abrirPdf(btn.getAttribute('data-pdf-dl'), false));
+  });
+  root.querySelectorAll('[data-upload-doc]').forEach((btn) => {
+    btn.addEventListener('click', () => uploadPdfDocumento(btn));
+  });
+}
+
+async function abrirPdf(ficheiroId, inline) {
+  try {
+    const r = await API.downloadFaturacaoFicheiro(ficheiroId, inline);
+    if (inline) {
+      window.open(r.url, '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = r.url;
+      a.download = r.nome;
+      a.click();
+    }
+    setTimeout(() => URL.revokeObjectURL(r.url), 60000);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast(e.message, 'warning');
+  }
+}
+
+function uploadPdfDocumento(btn) {
+  const tipo = btn.getAttribute('data-upload-tipo');
+  const id = btn.getAttribute('data-upload-id');
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,.pdf';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      await API.uploadFaturacaoDocumento(tipo, id, file);
+      if (typeof showToast === 'function') showToast('PDF arquivado', 'success');
+      loadAll();
+    } catch (e) {
+      if (typeof showToast === 'function') showToast(e.message, 'warning');
+    }
+  };
+  input.click();
+}
+
 async function loadAll() {
   const banner = document.getElementById('fatMigrateBanner');
   try {
-    await Promise.all([loadEmitidas(), loadRecebidas(), loadResumoIva()]);
+    await Promise.all([loadEmitidas(), loadRecebidas(), loadResumoIva(), loadArquivo(), atualizarBannerPdf()]);
     if (banner) banner.classList.add('hidden-banner');
   } catch (e) {
     const msg = e.message || String(e);
-    if (banner && (msg.indexOf('503') !== -1 || msg.indexOf('009') !== -1 || msg.indexOf('faturacao') !== -1)) {
-      banner.textContent = 'Execute a migração: /api/migrate_009_faturacao.php';
+    if (banner && (msg.indexOf('503') !== -1 || msg.indexOf('009') !== -1 || msg.indexOf('012') !== -1 || msg.indexOf('faturacao') !== -1)) {
+      banner.textContent =
+        'Execute as migrações: /api/migrate_009_faturacao.php e /api/migrate_012_documentos.php';
       banner.classList.remove('hidden-banner');
     }
     if (typeof showToast === 'function') showToast(msg, 'warning');
+  }
+}
+
+async function atualizarBannerPdf() {
+  const el = document.getElementById('fatPdfBanner');
+  if (!el) return;
+  try {
+    const r = await API.getFaturacaoConfig();
+    if (r.pdf_disponivel) {
+      el.classList.add('hidden-banner');
+      return;
+    }
+    el.textContent =
+      'Geração automática de PDF: execute composer install na pasta do projeto (Dompdf). Enquanto isso, as faturas ficam arquivadas em HTML e pode carregar PDFs manualmente.';
+    el.classList.remove('hidden-banner');
+  } catch (e) {
+    /* ignore */
   }
 }
 
@@ -99,12 +188,13 @@ async function loadEmitidas() {
   const list = r.emitidas || [];
   const tb = document.querySelector('#tblEmitidas tbody');
   if (!list.length) {
-    tb.innerHTML = '<tr><td colspan="9" class="table-empty-msg">Sem faturas no período.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="table-empty-msg">Sem faturas no período.</td></tr>';
     return;
   }
   tb.innerHTML = list
     .map((f) => {
       const doc = f.serie + ' ' + f.numero + '/' + (f.data_emissao || '').slice(0, 4);
+      const fid = f.ficheiro_id || (f.ficheiro && f.ficheiro.ficheiro_id);
       const acoes =
         '<button type="button" class="btn btn-secondary btn-sm" data-ver-fat="' +
         f.fatura_id +
@@ -114,6 +204,11 @@ async function loadEmitidas() {
             f.fatura_id +
             '">Anular</button>'
           : '');
+      const uploadBtn = !f.tem_ficheiro
+        ? ' <button type="button" class="btn btn-secondary btn-sm" data-upload-doc data-upload-tipo="emitida" data-upload-id="' +
+          f.fatura_id +
+          '">Carregar PDF</button>'
+        : '';
       return (
         '<tr><td><strong>' +
         escapeHtml(doc) +
@@ -132,6 +227,11 @@ async function loadEmitidas() {
         '</td><td>' +
         escapeHtml(f.estado) +
         '</td><td>' +
+        pdfBadge(f.tem_ficheiro) +
+        ' ' +
+        botoesPdf(fid, f.tem_ficheiro) +
+        uploadBtn +
+        '</td><td>' +
         acoes +
         '</td></tr>'
       );
@@ -143,6 +243,7 @@ async function loadEmitidas() {
   tb.querySelectorAll('[data-anul-fat]').forEach((btn) => {
     btn.addEventListener('click', () => anularFatura(btn.getAttribute('data-anul-fat')));
   });
+  ligarBotoesPdf(tb);
 }
 
 async function loadRecebidas() {
@@ -151,11 +252,16 @@ async function loadRecebidas() {
   const list = r.recebidas || [];
   const tb = document.querySelector('#tblRecebidas tbody');
   if (!list.length) {
-    tb.innerHTML = '<tr><td colspan="8" class="table-empty-msg">Sem documentos recebidos.</td></tr>';
+    tb.innerHTML = '<tr><td colspan="9" class="table-empty-msg">Sem documentos recebidos.</td></tr>';
     return;
   }
   tb.innerHTML = list
     .map((x) => {
+      const uploadBtn = !x.tem_ficheiro
+        ? '<button type="button" class="btn btn-secondary btn-sm" data-upload-doc data-upload-tipo="recebida" data-upload-id="' +
+          x.recebida_id +
+          '">Carregar PDF</button> '
+        : '';
       return (
         '<tr><td>' +
         escapeHtml(x.data_documento) +
@@ -171,12 +277,19 @@ async function loadRecebidas() {
         fmtEuro(x.total_iva) +
         '</td><td>' +
         fmtEuro(x.total_com_iva) +
+        '</td><td>' +
+        pdfBadge(x.tem_ficheiro) +
+        ' ' +
+        botoesPdf(x.ficheiro_id || (x.ficheiro && x.ficheiro.ficheiro_id), x.tem_ficheiro) +
+        ' ' +
+        uploadBtn +
         '</td><td><button type="button" class="btn btn-danger btn-sm" data-del-rec="' +
         x.recebida_id +
         '">Apagar</button></td></tr>'
       );
     })
     .join('');
+  ligarBotoesPdf(tb);
   tb.querySelectorAll('[data-del-rec]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       if (!confirm('Apagar este documento?')) return;
@@ -191,22 +304,87 @@ async function loadRecebidas() {
   });
 }
 
+async function loadArquivo() {
+  const { de, ate } = periodo();
+  const tipo = document.getElementById('arqTipo').value;
+  const q = document.getElementById('arqQ').value.trim();
+  const cfRaw = document.getElementById('arqFicheiro').value;
+  const opts = { tipo: tipo || undefined, q: q || undefined };
+  if (cfRaw === '1') opts.com_ficheiro = true;
+  if (cfRaw === '0') opts.com_ficheiro = false;
+  const r = await API.getFaturacaoArquivo(de, ate, opts);
+  const list = r.documentos || [];
+  const tb = document.querySelector('#tblArquivo tbody');
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="table-empty-msg">Nenhum documento no arquivo para estes filtros.</td></tr>';
+    return;
+  }
+  tb.innerHTML = list
+    .map((d) => {
+      const tipoLabel = d.tipo === 'emitida' ? 'Emitida' : 'Recebida';
+      const acoes =
+        botoesPdf(d.ficheiro_id, d.tem_ficheiro) +
+        (!d.tem_ficheiro
+          ? ' <button type="button" class="btn btn-secondary btn-sm" data-upload-doc data-upload-tipo="' +
+            d.tipo +
+            '" data-upload-id="' +
+            d.documento_id +
+            '">Carregar</button>'
+          : '') +
+        (d.tipo === 'emitida'
+          ? ' <button type="button" class="btn btn-secondary btn-sm" data-ver-fat="' + d.documento_id + '">Detalhe</button>'
+          : '');
+      return (
+        '<tr><td>' +
+        escapeHtml(tipoLabel) +
+        '</td><td><strong>' +
+        escapeHtml(d.referencia || '—') +
+        '</strong></td><td>' +
+        escapeHtml(d.data) +
+        '</td><td>' +
+        escapeHtml(d.entidade) +
+        '</td><td>' +
+        escapeHtml(d.nif || '—') +
+        '</td><td>' +
+        fmtEuro(d.total_com_iva) +
+        '</td><td>' +
+        pdfBadge(d.tem_ficheiro) +
+        '</td><td>' +
+        acoes +
+        '</td></tr>'
+      );
+    })
+    .join('');
+  ligarBotoesPdf(tb);
+  tb.querySelectorAll('[data-ver-fat]').forEach((btn) => {
+    btn.addEventListener('click', () => verFatura(btn.getAttribute('data-ver-fat')));
+  });
+}
+
 async function loadResumoIva() {
   const { de, ate } = periodo();
   const r = await API.getFaturacaoResumoIva(de, ate);
   const deb = r.iva_debito || {};
   const cred = r.iva_credito || {};
+  const aEntregar = r.iva_a_entregar != null ? r.iva_a_entregar : Math.max(0, r.iva_liquidar_estimado || 0);
+  const credito = r.iva_credito_periodo || 0;
   document.getElementById('ivaCards').innerHTML =
     '<div class="stat-card stat-card--compact"><div class="stat-icon">📤</div><div class="stat-info"><h3>' +
     fmtEuro(deb.iva) +
-    '</h3><p>IVA debitado (vendas)</p></div></div>' +
+    '</h3><p>IVA nas vendas (debitado)</p></div></div>' +
     '<div class="stat-card stat-card--compact"><div class="stat-icon">📥</div><div class="stat-info"><h3>' +
     fmtEuro(cred.iva) +
-    '</h3><p>IVA dedutível (compras)</p></div></div>' +
+    '</h3><p>IVA nas compras (dedutível)</p></div></div>' +
     '<div class="stat-card stat-card--compact"><div class="stat-icon">🧮</div><div class="stat-info"><h3>' +
-    fmtEuro(r.iva_liquidar_estimado) +
-    '</h3><p>IVA a liquidar (est.)</p></div></div>';
-  document.getElementById('ivaNota').textContent = r.nota || '';
+    fmtEuro(aEntregar) +
+    '</h3><p>IVA a entregar (estimado)</p></div></div>' +
+    (credito > 0
+      ? '<div class="stat-card stat-card--compact"><div class="stat-icon">↩️</div><div class="stat-info"><h3>' +
+        fmtEuro(credito) +
+        '</h3><p>Crédito de IVA (compras &gt; vendas)</p></div></div>'
+      : '');
+  const explic = (r.explicacao || '') + (r.compras_maior_que_vendas ? ' Neste período o IVA dedutível supera o debitado.' : '');
+  document.getElementById('ivaNota').textContent = explic + ' ' + (r.nota || '');
 
   const taxas = new Set([
     ...Object.keys(deb.por_taxa || {}),
@@ -278,7 +456,9 @@ async function emitirEnc() {
   if (!confirm('Emitir fatura para a encomenda #' + id + '?')) return;
   try {
     const r = await API.emitirFatura({ encomenda_id: id, taxa_iva_pct: taxaPadrao });
-    if (typeof showToast === 'function') showToast('Fatura ' + (r.documento || '') + ' emitida', 'success');
+    let msg = 'Fatura ' + (r.documento || '') + ' emitida';
+    if (r.pdf_aviso) msg += ' — ' + r.pdf_aviso;
+    if (typeof showToast === 'function') showToast(msg, r.pdf_aviso ? 'warning' : 'success');
     loadAll();
     if (r.fatura_id) verFatura(r.fatura_id);
   } catch (e) {
@@ -303,10 +483,13 @@ async function addRecebida() {
     if (typeof showToast === 'function') showToast('Entidade e valor são obrigatórios', 'warning');
     return;
   }
+  const pdfInput = document.getElementById('recPdf');
+  const pdfFile = pdfInput.files && pdfInput.files[0] ? pdfInput.files[0] : null;
   try {
-    await API.createFaturaRecebida(payload);
+    await API.createFaturaRecebida(payload, pdfFile);
     if (typeof showToast === 'function') showToast('Documento registado', 'success');
     document.getElementById('recValor').value = '';
+    pdfInput.value = '';
     loadAll();
   } catch (e) {
     if (typeof showToast === 'function') showToast(e.message, 'warning');
@@ -391,6 +574,22 @@ async function verFatura(id) {
       '</strong></p>' +
       (f.notas ? '<p class="muted">' + escapeHtml(f.notas) + '</p>' : '') +
       '</div>';
+    const footer = document.querySelector('#faturaPrintModal .modal-footer-actions');
+    const fid = f.ficheiro_id || (f.ficheiro && f.ficheiro.ficheiro_id);
+    let extra = '';
+    if (fid) {
+      extra =
+        '<button type="button" class="btn btn-secondary" id="fatModalPdfVer">Abrir PDF</button>' +
+        '<button type="button" class="btn btn-secondary" id="fatModalPdfDl">Descarregar PDF</button>';
+    }
+    if (footer) {
+      const base = footer.innerHTML;
+      footer.innerHTML = extra + base;
+      const v = document.getElementById('fatModalPdfVer');
+      const d = document.getElementById('fatModalPdfDl');
+      if (v) v.onclick = () => abrirPdf(fid, true);
+      if (d) d.onclick = () => abrirPdf(fid, false);
+    }
     document.getElementById('faturaPrintModal').classList.add('active');
   } catch (e) {
     if (typeof showToast === 'function') showToast(e.message, 'warning');
@@ -399,6 +598,14 @@ async function verFatura(id) {
 
 function closePrint() {
   document.getElementById('faturaPrintModal').classList.remove('active');
+  const footer = document.querySelector('#faturaPrintModal .modal-footer-actions');
+  if (footer) {
+    footer.innerHTML =
+      '<button type="button" id="faturaPrintBtn" class="btn btn-primary">Imprimir / PDF</button>' +
+      '<button type="button" id="faturaPrintClose2" class="btn btn-secondary">Fechar</button>';
+    document.getElementById('faturaPrintClose2').addEventListener('click', closePrint);
+    document.getElementById('faturaPrintBtn').addEventListener('click', () => window.print());
+  }
 }
 
 async function anularFatura(id) {
@@ -416,8 +623,7 @@ function exportAt() {
   const { de, ate } = periodo();
   const base = typeof API_BASE_URL !== 'undefined' ? API_BASE_URL : '/index.php';
   const url =
-    base +
-    '/faturacao?view=export-at&de=' +
+    `${base}/faturacao?view=export-at&de=` +
     encodeURIComponent(de) +
     '&ate=' +
     encodeURIComponent(ate);

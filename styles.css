@@ -1841,6 +1841,35 @@ motion {
     margin-bottom: 14px;
 }
 
+.alert-banner--info {
+    background: var(--surface-info, #e8f4fc);
+    border-color: var(--border-info, #b8d9ee);
+    color: var(--text-info, #1a4d6e);
+}
+
+.badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.badge--ok {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge--muted {
+    background: #e9ecef;
+    color: #6c757d;
+}
+
+.filters-toolbar--wrap {
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 .info-card--narrow {
     max-width: 720px;
 }

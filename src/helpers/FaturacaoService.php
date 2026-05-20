@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/IvaHelper.php';
 require_once __DIR__ . '/LucroCalculator.php';
+require_once __DIR__ . '/DocumentStorageService.php';
 
 /**
  * Faturação emitida/recebida e resumo de IVA (informativo — validar com contabilista).
@@ -31,8 +32,9 @@ class FaturacaoService
         $sql .= ' ORDER BY data_emissao DESC, numero DESC';
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return DocumentStorageService::anexarMetadados($db, 'emitida', $rows);
     }
 
     public static function obterEmitida(PDO $db, int $id): ?array
@@ -47,6 +49,11 @@ class FaturacaoService
         $stmtL->execute([$id]);
         $f['linhas'] = $stmtL->fetchAll(PDO::FETCH_ASSOC) ?: [];
         $f['empresa'] = self::getConfig($db);
+        if (file_exists(__DIR__ . '/DocumentStorageService.php')) {
+            require_once __DIR__ . '/DocumentStorageService.php';
+            $rows = DocumentStorageService::anexarMetadados($db, 'emitida', [$f]);
+            $f = $rows[0] ?? $f;
+        }
 
         return $f;
     }
@@ -168,14 +175,29 @@ class FaturacaoService
             self::inserirLinhas($db, $faturaId, $linhas);
             $db->commit();
 
-            return [
+            $arquivo = ['pdf_gerado' => false];
+            if (file_exists(__DIR__ . '/FaturaPdfService.php')) {
+                require_once __DIR__ . '/FaturaPdfService.php';
+                $pdfRes = FaturaPdfService::arquivarEmitida($db, $faturaId, null);
+                if (!empty($pdfRes['ficheiro_id'])) {
+                    $arquivo['ficheiro_id'] = $pdfRes['ficheiro_id'];
+                    $arquivo['pdf_gerado'] = ($pdfRes['mime_type'] ?? '') === 'application/pdf';
+                    $arquivo['pdf_aviso'] = $arquivo['pdf_gerado']
+                        ? null
+                        : 'PDF não gerado — execute composer install na pasta do projeto para Dompdf, ou use o HTML arquivado.';
+                } elseif (!empty($pdfRes['error'])) {
+                    $arquivo['pdf_aviso'] = $pdfRes['error'];
+                }
+            }
+
+            return array_merge([
                 'message' => 'Fatura emitida',
                 'fatura_id' => $faturaId,
                 'documento' => $serie . ' ' . $numero . '/' . date('Y', strtotime($dataEmissao)),
                 'serie' => $serie,
                 'numero' => $numero,
                 'totais' => $totais,
-            ];
+            ], $arquivo);
         } catch (Throwable $e) {
             if ($db->inTransaction()) {
                 $db->rollBack();
@@ -213,8 +235,80 @@ class FaturacaoService
              ORDER BY data_documento DESC, recebida_id DESC'
         );
         $stmt->execute([$de, $ate]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return DocumentStorageService::anexarMetadados($db, 'recebida', $rows);
+    }
+
+    /**
+     * Arquivo unificado (emitidas + recebidas) com filtros.
+     */
+    public static function listarArquivo(
+        PDO $db,
+        string $de,
+        string $ate,
+        ?string $tipo = null,
+        ?string $q = null,
+        ?bool $soComFicheiro = null
+    ): array {
+        $out = [];
+        if ($tipo === null || $tipo === '' || $tipo === 'emitida') {
+            foreach (self::listarEmitidas($db, $de, $ate, null) as $e) {
+                $out[] = [
+                    'tipo' => 'emitida',
+                    'documento_id' => (int) $e['fatura_id'],
+                    'referencia' => ($e['serie'] ?? 'FT') . ' ' . ($e['numero'] ?? ''),
+                    'data' => $e['data_emissao'],
+                    'entidade' => $e['cliente_nome'],
+                    'nif' => $e['cliente_nif'],
+                    'total_com_iva' => (float) $e['total_com_iva'],
+                    'estado' => $e['estado'],
+                    'tem_ficheiro' => !empty($e['tem_ficheiro']),
+                    'ficheiro' => $e['ficheiro'] ?? null,
+                    'ficheiro_id' => $e['ficheiro_id'] ?? null,
+                    'encomenda_id' => $e['encomenda_id'] ?? null,
+                ];
+            }
+        }
+        if ($tipo === null || $tipo === '' || $tipo === 'recebida') {
+            foreach (self::listarRecebidas($db, $de, $ate) as $r) {
+                $out[] = [
+                    'tipo' => 'recebida',
+                    'documento_id' => (int) $r['recebida_id'],
+                    'referencia' => $r['numero'] ?? ('REC-' . $r['recebida_id']),
+                    'data' => $r['data_documento'],
+                    'entidade' => $r['entidade_nome'],
+                    'nif' => $r['entidade_nif'],
+                    'total_com_iva' => (float) $r['total_com_iva'],
+                    'estado' => $r['tipo'],
+                    'tem_ficheiro' => !empty($r['tem_ficheiro']),
+                    'ficheiro' => $r['ficheiro'] ?? null,
+                    'ficheiro_id' => $r['ficheiro_id'] ?? null,
+                    'pedido_id' => $r['pedido_id'] ?? null,
+                    'despesa_id' => $r['despesa_id'] ?? null,
+                ];
+            }
+        }
+        if ($q !== null && trim($q) !== '') {
+            $q = mb_strtolower(trim($q));
+            $out = array_values(array_filter($out, static function ($row) use ($q) {
+                $blob = mb_strtolower(
+                    ($row['entidade'] ?? '') . ' ' . ($row['nif'] ?? '') . ' ' . ($row['referencia'] ?? '')
+                );
+
+                return strpos($blob, $q) !== false;
+            }));
+        }
+        if ($soComFicheiro === true) {
+            $out = array_values(array_filter($out, static fn ($row) => !empty($row['tem_ficheiro'])));
+        } elseif ($soComFicheiro === false) {
+            $out = array_values(array_filter($out, static fn ($row) => empty($row['tem_ficheiro'])));
+        }
+        usort($out, static function ($a, $b) {
+            return strcmp((string) ($b['data'] ?? ''), (string) ($a['data'] ?? ''));
+        });
+
+        return $out;
     }
 
     public static function criarRecebida(PDO $db, array $data): array
@@ -255,10 +349,27 @@ class FaturacaoService
              total_base, taxa_iva_pct, total_iva, total_com_iva, notas)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
         );
+        $pedidoId = isset($data['pedido_id']) && (int) $data['pedido_id'] > 0 ? (int) $data['pedido_id'] : null;
+        $despesaId = isset($data['despesa_id']) && (int) $data['despesa_id'] > 0 ? (int) $data['despesa_id'] : null;
+        if ($pedidoId) {
+            $chk = $db->prepare('SELECT recebida_id FROM faturas_recebidas WHERE pedido_id = ? LIMIT 1');
+            $chk->execute([$pedidoId]);
+            if ($chk->fetch(PDO::FETCH_ASSOC)) {
+                return ['error' => 'Este pedido já tem documento fiscal registado', 'code' => 409];
+            }
+        }
+        if ($despesaId) {
+            $chk = $db->prepare('SELECT recebida_id FROM faturas_recebidas WHERE despesa_id = ? LIMIT 1');
+            $chk->execute([$despesaId]);
+            if ($chk->fetch(PDO::FETCH_ASSOC)) {
+                return ['error' => 'Esta despesa já tem documento fiscal registado', 'code' => 409];
+            }
+        }
+
         $stmt->execute([
             $tipo,
-            isset($data['pedido_id']) ? (int) $data['pedido_id'] : null,
-            isset($data['despesa_id']) ? (int) $data['despesa_id'] : null,
+            $pedidoId,
+            $despesaId,
             trim((string) ($data['numero'] ?? '')) ?: null,
             $dataDoc,
             $nome,
@@ -340,11 +451,18 @@ class FaturacaoService
 
         $ivaLiquidar = round($emitido['iva'] - $recebido['iva'], 2);
 
+        $comprasMaior = $recebido['iva'] > $emitido['iva'];
+
         return [
             'periodo' => ['de' => $de, 'ate' => $ate],
             'iva_debito' => $emitido,
             'iva_credito' => $recebido,
             'iva_liquidar_estimado' => $ivaLiquidar,
+            'iva_a_entregar' => max(0, $ivaLiquidar),
+            'iva_credito_periodo' => $ivaLiquidar < 0 ? abs($ivaLiquidar) : 0.0,
+            'compras_maior_que_vendas' => $comprasMaior,
+            'explicacao' => 'IVA cobrado nas vendas (faturas emitidas) menos IVA das compras/despesas com documento (faturas recebidas). '
+                . 'Registe todos os PDFs de fornecedores para o valor de dedução estar completo.',
             'nota' => 'Resumo informativo. A entrega à AT (e-Fatura/SAF-T) requer certificação de software — use o exportação CSV para o contabilista.',
             'empresa' => self::getConfig($db),
         ];

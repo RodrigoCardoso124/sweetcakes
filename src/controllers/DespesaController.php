@@ -102,9 +102,19 @@ class DespesaController
 
         $id = $this->despesa->create($parsed['row']);
 
+        $ivaSync = null;
+        if (file_exists(__DIR__ . '/../helpers/FaturacaoIntegracaoService.php')) {
+            require_once __DIR__ . '/../helpers/FaturacaoIntegracaoService.php';
+            $ivaSync = FaturacaoIntegracaoService::sincronizarDespesa($this->db, $id);
+        }
+
         http_response_code(201);
 
-        echo json_encode(['message' => 'Despesa registada', 'despesa_id' => $id], JSON_UNESCAPED_UNICODE);
+        echo json_encode([
+            'message' => 'Despesa registada',
+            'despesa_id' => $id,
+            'fiscal_sync' => $ivaSync,
+        ], JSON_UNESCAPED_UNICODE);
 
     }
 
