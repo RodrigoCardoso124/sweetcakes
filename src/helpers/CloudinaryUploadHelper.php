@@ -6,6 +6,14 @@
  */
 class CloudinaryUploadHelper
 {
+    /** PHP 8.5+: curl_close() está obsoleto (handle liberta-se automaticamente). */
+    private static function curlClose($ch): void
+    {
+        if (PHP_VERSION_ID < 80500) {
+            curl_close($ch);
+        }
+    }
+
     private static function envVar(string $key): ?string
     {
         if (!empty($_ENV[$key]) && is_string($_ENV[$key])) {
@@ -137,7 +145,8 @@ class CloudinaryUploadHelper
     }
 
     /**
-     * Upload PDF com image/upload — idêntico às fotos de produto (mesmo preset / mesma assinatura).
+     * Upload PDF com raw/upload (PDF não pode ir para image/upload).
+     * Assinatura igual às fotos: folder + timestamp + secret (só muda o endpoint).
      */
     private static function uploadPdfCurl(CURLFile $curlFile, ?string &$error = null): ?string
     {
@@ -155,7 +164,7 @@ class CloudinaryUploadHelper
 
         $cloudName = $cfg['cloud_name'];
         $folder = $cfg['folder'];
-        $endpoint = "https://api.cloudinary.com/v1_1/{$cloudName}/image/upload";
+        $endpoint = "https://api.cloudinary.com/v1_1/{$cloudName}/raw/upload";
         $postFields = [
             'file' => $curlFile,
             'folder' => $folder,
@@ -188,7 +197,7 @@ class CloudinaryUploadHelper
         $response = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
-        curl_close($ch);
+        self::curlClose($ch);
 
         if ($response === false || $curlError) {
             $error = 'Cloudinary: ' . ($curlError ?: 'erro de rede');
@@ -311,7 +320,7 @@ class CloudinaryUploadHelper
         $body = curl_exec($ch);
         $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr = curl_error($ch) ?: null;
-        curl_close($ch);
+        self::curlClose($ch);
         if ($body === false || $httpCode < 200 || $httpCode >= 400) {
             return is_string($body) ? $body : null;
         }
