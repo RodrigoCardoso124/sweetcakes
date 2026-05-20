@@ -256,6 +256,7 @@ class PedidoIngredienteController
 
                         return;
                     }
+                    require_once __DIR__ . '/../helpers/CloudinaryUploadHelper.php';
                     require_once __DIR__ . '/../helpers/DocumentStorageService.php';
                     $arquivo = DocumentStorageService::guardarUpload(
                         $this->db,
@@ -269,7 +270,7 @@ class PedidoIngredienteController
                         http_response_code($arquivo['code'] ?? 500);
                         echo json_encode([
                             'message' => $arquivo['error'],
-                            'hint' => 'Confirme CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no Vercel',
+                            'hint' => CloudinaryUploadHelper::configErrorMessage(),
                             'fiscal' => $fiscal,
                         ], JSON_UNESCAPED_UNICODE);
 
