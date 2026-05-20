@@ -18,10 +18,9 @@ class FaturacaoIntegracaoService
             return ['skipped' => true];
         }
         $stmt = $db->prepare(
-            'SELECT p.*, i.nome AS ingrediente_nome, f.empresa AS fornecedor_empresa
+            'SELECT p.*, i.nome AS ingrediente_nome
              FROM pedidos_ingrediente p
              LEFT JOIN ingredientes i ON i.ingrediente_id = p.ingrediente_id
-             LEFT JOIN fornecedores f ON f.fornecedor_id = p.fornecedor_id
              WHERE p.pedido_id = ? LIMIT 1'
         );
         $stmt->execute([$pedidoId]);
@@ -39,7 +38,13 @@ class FaturacaoIntegracaoService
             return ['recebida_id' => (int) $row['recebida_id'], 'existente' => true];
         }
 
-        $nome = trim((string) ($p['fornecedor_empresa'] ?? ''));
+        $nome = trim((string) ($p['notas'] ?? ''));
+        if ($nome === '') {
+            $email = trim((string) ($p['email_fornecedor'] ?? ''));
+            if ($email !== '') {
+                $nome = 'Fornecedor (' . $email . ')';
+            }
+        }
         if ($nome === '') {
             $nome = 'Fornecedor — ' . trim((string) ($p['ingrediente_nome'] ?? 'Materiais'));
         }
