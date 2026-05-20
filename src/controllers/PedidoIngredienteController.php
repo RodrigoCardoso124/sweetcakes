@@ -10,50 +10,59 @@ class PedidoIngredienteController
 {
     private static function anexarFiscalAosPedidos(PDO $db, array $list): array
     {
-        if (!$list || !LucroCalculator::tableExists($db, 'faturas_recebidas')) {
-            return $list;
-        }
-        $pids = [];
-        foreach ($list as $p) {
-            if (($p['estado'] ?? '') === 'recebido') {
-                $pids[] = (int) $p['pedido_id'];
+        try {
+            if (!$list || !LucroCalculator::tableExists($db, 'faturas_recebidas')) {
+                return $list;
             }
-        }
-        if (!$pids) {
-            return $list;
-        }
-        $placeholders = implode(',', array_fill(0, count($pids), '?'));
-        $stmt = $db->prepare(
-            "SELECT * FROM faturas_recebidas WHERE pedido_id IN ($placeholders)"
-        );
-        $stmt->execute($pids);
-        $recs = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        if (!$recs) {
-            return $list;
-        }
-        if (file_exists(__DIR__ . '/../helpers/DocumentStorageService.php')) {
-            require_once __DIR__ . '/../helpers/DocumentStorageService.php';
-            $recs = DocumentStorageService::anexarMetadados($db, 'recebida', $recs);
-        }
-        $map = [];
-        foreach ($recs as $r) {
-            $map[(int) $r['pedido_id']] = $r;
-        }
-        foreach ($list as &$p) {
-            $pid = (int) ($p['pedido_id'] ?? 0);
-            if (!isset($map[$pid])) {
-                continue;
+            if (!LucroCalculator::columnExists($db, 'faturas_recebidas', 'pedido_id')) {
+                return $list;
             }
-            $r = $map[$pid];
-            $p['recebida_id'] = (int) $r['recebida_id'];
-            $p['tem_ficheiro'] = !empty($r['tem_ficheiro']);
-            $p['ficheiro_id'] = $r['ficheiro_id'] ?? null;
-            $p['url_abrir'] = $r['url_abrir'] ?? null;
-            if (!empty($r['numero']) && empty($p['num_fatura'])) {
-                $p['num_fatura'] = $r['numero'];
+            $pids = [];
+            foreach ($list as $p) {
+                if (($p['estado'] ?? '') === 'recebido') {
+                    $pids[] = (int) $p['pedido_id'];
+                }
             }
+            if (!$pids) {
+                return $list;
+            }
+            $placeholders = implode(',', array_fill(0, count($pids), '?'));
+            $stmt = $db->prepare(
+                "SELECT * FROM faturas_recebidas WHERE pedido_id IN ($placeholders)"
+            );
+            $stmt->execute($pids);
+            $recs = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (!$recs) {
+                return $list;
+            }
+            if (file_exists(__DIR__ . '/../helpers/DocumentStorageService.php')) {
+                require_once __DIR__ . '/../helpers/DocumentStorageService.php';
+                if (DocumentStorageService::tabelasOk($db)) {
+                    $recs = DocumentStorageService::anexarMetadados($db, 'recebida', $recs);
+                }
+            }
+            $map = [];
+            foreach ($recs as $r) {
+                $map[(int) $r['pedido_id']] = $r;
+            }
+            foreach ($list as &$p) {
+                $pid = (int) ($p['pedido_id'] ?? 0);
+                if (!isset($map[$pid])) {
+                    continue;
+                }
+                $r = $map[$pid];
+                $p['recebida_id'] = (int) $r['recebida_id'];
+                $p['tem_ficheiro'] = !empty($r['tem_ficheiro']);
+                $p['ficheiro_id'] = $r['ficheiro_id'] ?? null;
+                $p['url_abrir'] = $r['url_abrir'] ?? null;
+                if (!empty($r['numero']) && empty($p['num_fatura'])) {
+                    $p['num_fatura'] = $r['numero'];
+                }
+            }
+            unset($p);
+        } catch (Throwable $e) {
+            error_log('anexarFiscalAosPedidos: ' . $e->getMessage());
         }
-        unset($p);
 
         return $list;
     }

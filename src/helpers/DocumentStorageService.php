@@ -322,7 +322,7 @@ class DocumentStorageService
         return null;
     }
 
-    public static function enviarDownload(PDO $db, int $ficheiroId, bool $inline = false): void
+    public static function enviarDownload(PDO $db, int $ficheiroId, bool $inline = false, bool $jsonMeta = false): void
     {
         $row = self::obter($db, $ficheiroId);
         if (!$row) {
@@ -334,6 +334,16 @@ class DocumentStorageService
         }
         $url = self::urlAbrir($row);
         if ($url !== null) {
+            if ($jsonMeta) {
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode([
+                    'url' => $url,
+                    'nome' => $row['nome_original'] ?? 'documento.pdf',
+                    'externo' => true,
+                ], JSON_UNESCAPED_UNICODE);
+
+                return;
+            }
             header('Location: ' . $url, true, 302);
             exit;
         }

@@ -544,32 +544,60 @@ const API = {
     },
 
     async downloadFaturacaoFicheiro(ficheiroId, inline) {
-        const url =
-            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(ficheiroId))}` +
-            (inline ? '&inline=1' : '');
-        const headers = { Accept: 'application/pdf,*/*' };
-        const sessionId = localStorage.getItem('apiSessionId');
+        const sessionId = localStorage.getItem('apiSessionId') || '';
         const token = localStorage.getItem('adminToken') || sessionId;
+        let url =
+            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(ficheiroId))}&meta=1` +
+            (inline ? '&inline=1' : '');
+        if (sessionId) {
+            url += '&access_token=' + encodeURIComponent(sessionId);
+        }
+        const headers = { Accept: 'application/json' };
         if (sessionId) headers['X-Session-ID'] = sessionId;
         if (token) headers['Authorization'] = 'Bearer ' + token;
-        const response = await fetch(url, { method: 'GET', headers });
+        const response = await fetch(url, { method: 'GET', headers, credentials: 'include' });
         if (!response.ok) {
             const text = await response.text();
-            let msg = 'Erro ao descarregar';
+            let msg = 'Erro ao abrir ficheiro (sessão expirada?)';
             try {
                 const j = JSON.parse(text);
                 if (j.message) msg = j.message;
             } catch (e) {
                 /* ignore */
             }
-            throw new Error(msg);
+            const err = new Error(msg);
+            err.status = response.status;
+            throw err;
+        }
+        const ct = (response.headers.get('Content-Type') || '').toLowerCase();
+        if (ct.indexOf('application/json') !== -1) {
+            const j = await response.json();
+            if (j.url) {
+                return { url: j.url, nome: j.nome || 'documento.pdf', externo: !!j.externo };
+            }
         }
         const blob = await response.blob();
         const disp = response.headers.get('Content-Disposition') || '';
         let nome = 'documento.pdf';
         const m = /filename\*?=(?:UTF-8'')?["']?([^"';]+)/i.exec(disp);
         if (m && m[1]) nome = decodeURIComponent(m[1].trim());
-        return { blob, nome, url: URL.createObjectURL(blob) };
+        return { blob, nome, url: URL.createObjectURL(blob), externo: false };
+    },
+
+    async openFaturacaoFicheiro(ficheiroId, urlDirecta) {
+        if (urlDirecta && /^https?:\/\//i.test(urlDirecta) && urlDirecta.indexOf('/faturacao') === -1) {
+            window.open(urlDirecta, '_blank', 'noopener');
+            return;
+        }
+        const fid = parseInt(String(ficheiroId || ''), 10);
+        if (!fid) {
+            throw new Error('Sem ficheiro arquivado');
+        }
+        const r = await this.downloadFaturacaoFicheiro(fid, true);
+        window.open(r.url, '_blank', 'noopener');
+        if (!r.externo) {
+            setTimeout(() => URL.revokeObjectURL(r.url), 120000);
+        }
     },
 
     async _faturacaoMultipart(formData) {

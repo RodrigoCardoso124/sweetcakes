@@ -115,18 +115,8 @@ function ligarAbrirFicheiro(root) {
 }
 
 async function abrirFicheiro(ficheiroId, urlDirecta) {
-  if (urlDirecta) {
-    window.open(urlDirecta, '_blank', 'noopener');
-    return;
-  }
-  if (!ficheiroId) {
-    if (typeof showToast === 'function') showToast('Sem ficheiro arquivado', 'warning');
-    return;
-  }
   try {
-    const r = await API.downloadFaturacaoFicheiro(ficheiroId, true);
-    window.open(r.url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(r.url), 60000);
+    await API.openFaturacaoFicheiro(ficheiroId, urlDirecta);
   } catch (e) {
     if (typeof showToast === 'function') showToast(e.message, 'warning');
   }
@@ -335,10 +325,8 @@ async function emitirEncomenda(encomendaId) {
     let msg = 'Fatura ' + (r.documento || '') + ' emitida';
     if (typeof showToast === 'function') showToast(msg, 'success');
     await loadAll();
-    if (r.url_abrir) {
-      window.open(r.url_abrir, '_blank', 'noopener');
-    } else if (r.ficheiro_id) {
-      abrirFicheiro(r.ficheiro_id, null);
+    if (r.ficheiro_id || r.url_abrir) {
+      await API.openFaturacaoFicheiro(r.ficheiro_id, r.url_abrir);
     } else if (r.pdf_aviso) {
       if (typeof showToast === 'function') showToast(r.pdf_aviso, 'warning');
     }

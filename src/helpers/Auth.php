@@ -74,10 +74,25 @@ class Auth
     private static function getHeaderSessionToken(): ?string
     {
         $sid = $_SERVER['HTTP_X_SESSION_ID'] ?? '';
-        if (!is_string($sid) || trim($sid) === '') {
-            return null;
+        if (is_string($sid) && trim($sid) !== '') {
+            return trim($sid);
         }
-        return trim($sid);
+
+        $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        if (is_string($auth) && preg_match('/^Bearer\s+(\S+)/i', $auth, $m)) {
+            return trim($m[1]);
+        }
+
+        foreach (['access_token', 'session_id'] as $q) {
+            if (!empty($_GET[$q]) && is_string($_GET[$q])) {
+                $t = trim($_GET[$q]);
+                if ($t !== '') {
+                    return $t;
+                }
+            }
+        }
+
+        return null;
     }
 
     private static function hydrateSessionFromTokenPayload(array $payload): void
@@ -164,14 +179,12 @@ class Auth
             'samesite' => 'Lax',
         ]);
 
-        if (!empty($_SERVER['HTTP_X_SESSION_ID']) && is_string($_SERVER['HTTP_X_SESSION_ID'])) {
-            $sid = $_SERVER['HTTP_X_SESSION_ID'];
-            if (preg_match('/^[a-zA-Z0-9,-]{16,128}$/', $sid)) {
-                session_id($sid);
-            }
-        }
-
+        // Não usar o JWT (X-Session-ID) como id de sessão PHP — só cookie nativo.
         session_start();
+
+        if (self::tryAuthenticateFromToken()) {
+            return;
+        }
     }
 
     public static function isLoggedIn(): bool

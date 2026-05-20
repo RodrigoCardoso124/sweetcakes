@@ -227,23 +227,16 @@ async function savePed() {
   }
 }
 
-function abrirFaturaPedido(p) {
-  const url = p.url_abrir;
-  const fid = p.ficheiro_id;
-  if (url) {
-    window.open(url, '_blank', 'noopener');
-    return;
+async function abrirFaturaPedido(p) {
+  try {
+    if (typeof API.openFaturacaoFicheiro === 'function') {
+      await API.openFaturacaoFicheiro(p.ficheiro_id, p.url_abrir);
+      return;
+    }
+    showToast('Sem PDF arquivado para este pedido', 'warning');
+  } catch (e) {
+    showToast(e.message || 'Erro ao abrir fatura', 'warning');
   }
-  if (fid && typeof API.downloadFaturacaoFicheiro === 'function') {
-    API.downloadFaturacaoFicheiro(fid, true)
-      .then((r) => {
-        window.open(r.url, '_blank', 'noopener');
-        setTimeout(() => URL.revokeObjectURL(r.url), 60000);
-      })
-      .catch((e) => showToast(e.message, 'warning'));
-    return;
-  }
-  showToast('Sem PDF arquivado para este pedido', 'warning');
 }
 
 function renderPed(list) {
@@ -355,11 +348,8 @@ async function saveRec() {
   try {
     const res = await API.updatePedidoIngredienteRecebido(id, payload, pdfFile);
     showToast('Pedido recebido — compra e PDF arquivados', 'success');
-    if (res.url_abrir) {
-      window.open(res.url_abrir, '_blank', 'noopener');
-    } else if (res.ficheiro_id && typeof API.downloadFaturacaoFicheiro === 'function') {
-      const dl = await API.downloadFaturacaoFicheiro(res.ficheiro_id, true);
-      window.open(dl.url, '_blank', 'noopener');
+    if (res.ficheiro_id || res.url_abrir) {
+      await API.openFaturacaoFicheiro(res.ficheiro_id, res.url_abrir);
     }
     document.querySelector('#recModal .modal-actions').style.display = 'none';
     document.getElementById('recLucroWrap').style.display = 'block';
