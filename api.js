@@ -398,6 +398,7 @@ const API = {
         }
         const url = `${API_BASE_URL}/pedidos_ingrediente/${id}`;
         const fd = new FormData();
+        fd.append('_method', 'PUT');
         Object.keys(data).forEach((k) => {
             if (data[k] != null && data[k] !== '') fd.append(k, String(data[k]));
         });
@@ -407,7 +408,7 @@ const API = {
         const token = localStorage.getItem('adminToken') || sessionId;
         if (sessionId) headers['X-Session-ID'] = sessionId;
         if (token) headers['Authorization'] = 'Bearer ' + token;
-        const response = await fetch(url, { method: 'PUT', headers, body: fd });
+        const response = await fetch(url, { method: 'POST', headers, body: fd });
         const text = await response.text();
         let result;
         try {
@@ -547,12 +548,12 @@ const API = {
         const sessionId = localStorage.getItem('apiSessionId') || '';
         const token = localStorage.getItem('adminToken') || sessionId;
         let url =
-            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(ficheiroId))}&meta=1` +
+            `${API_BASE_URL}/faturacao?view=download&ficheiro_id=${encodeURIComponent(String(ficheiroId))}` +
             (inline ? '&inline=1' : '');
         if (sessionId) {
             url += '&access_token=' + encodeURIComponent(sessionId);
         }
-        const headers = { Accept: 'application/json' };
+        const headers = { Accept: 'application/pdf,*/*' };
         if (sessionId) headers['X-Session-ID'] = sessionId;
         if (token) headers['Authorization'] = 'Bearer ' + token;
         const response = await fetch(url, { method: 'GET', headers, credentials: 'include' });
@@ -569,35 +570,33 @@ const API = {
             err.status = response.status;
             throw err;
         }
-        const ct = (response.headers.get('Content-Type') || '').toLowerCase();
-        if (ct.indexOf('application/json') !== -1) {
-            const j = await response.json();
-            if (j.url) {
-                return { url: j.url, nome: j.nome || 'documento.pdf', externo: !!j.externo };
-            }
-        }
         const blob = await response.blob();
         const disp = response.headers.get('Content-Disposition') || '';
         let nome = 'documento.pdf';
         const m = /filename\*?=(?:UTF-8'')?["']?([^"';]+)/i.exec(disp);
         if (m && m[1]) nome = decodeURIComponent(m[1].trim());
-        return { blob, nome, url: URL.createObjectURL(blob), externo: false };
+        const mime = blob.type && blob.type !== 'application/octet-stream' ? blob.type : 'application/pdf';
+        const typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
+        return { blob: typed, nome, url: URL.createObjectURL(typed), externo: false };
     },
 
     async openFaturacaoFicheiro(ficheiroId, urlDirecta) {
-        if (urlDirecta && /^https?:\/\//i.test(urlDirecta) && urlDirecta.indexOf('/faturacao') === -1) {
-            window.open(urlDirecta, '_blank', 'noopener');
-            return;
-        }
         const fid = parseInt(String(ficheiroId || ''), 10);
         if (!fid) {
             throw new Error('Sem ficheiro arquivado');
         }
         const r = await this.downloadFaturacaoFicheiro(fid, true);
-        window.open(r.url, '_blank', 'noopener');
-        if (!r.externo) {
-            setTimeout(() => URL.revokeObjectURL(r.url), 120000);
-        }
+        const a = document.createElement('a');
+        a.href = r.url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.title = r.nome || 'documento.pdf';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            URL.revokeObjectURL(r.url);
+            a.remove();
+        }, 120000);
     },
 
     async _faturacaoMultipart(formData) {

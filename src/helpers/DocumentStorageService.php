@@ -340,12 +340,14 @@ class DocumentStorageService
                     'url' => $url,
                     'nome' => $row['nome_original'] ?? 'documento.pdf',
                     'externo' => true,
+                    'usar_proxy' => true,
                 ], JSON_UNESCAPED_UNICODE);
 
                 return;
             }
-            header('Location: ' . $url, true, 302);
-            exit;
+            self::enviarConteudoRemoto($url, $row, $inline);
+
+            return;
         }
         $path = self::caminhoAbsoluto($row);
         if (!is_file($path) || !is_readable($path)) {
@@ -367,6 +369,45 @@ class DocumentStorageService
         header('Cache-Control: private, max-age=3600');
 
         readfile($path);
+        exit;
+    }
+
+    private static function enviarConteudoRemoto(string $url, array $row, bool $inline): void
+    {
+        if (!function_exists('curl_init')) {
+            http_response_code(502);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['message' => 'cURL necessário para obter ficheiro remoto']);
+
+            return;
+        }
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 90,
+            CURLOPT_SSL_VERIFYPEER => true,
+        ]);
+        $body = curl_exec($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+        if ($body === false || $code < 200 || $code >= 400) {
+            http_response_code(502);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['message' => 'Não foi possível obter o PDF: ' . ($curlErr ?: 'HTTP ' . $code)]);
+
+            return;
+        }
+        $nome = (string) ($row['nome_original'] ?? 'documento.pdf');
+        $mime = (string) ($row['mime_type'] ?? 'application/pdf');
+        $disp = $inline ? 'inline' : 'attachment';
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . strlen($body));
+        header('Content-Disposition: ' . $disp . '; filename="' . rawurlencode($nome) . '"');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, max-age=3600');
+        echo $body;
         exit;
     }
 

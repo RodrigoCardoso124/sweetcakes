@@ -187,6 +187,10 @@ class PedidoIngredienteController
         if (!is_array($data)) {
             $data = [];
         }
+        if (!empty($_POST) && empty($data['estado'])) {
+            $data = array_merge($data, $_POST);
+        }
+        unset($data['_method'], $data['action']);
         $estado = trim((string) ($data['estado'] ?? ''));
         if (!in_array($estado, ['pendente', 'recebido', 'cancelado'], true)) {
             http_response_code(400);

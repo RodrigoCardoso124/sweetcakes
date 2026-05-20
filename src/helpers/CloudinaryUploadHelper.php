@@ -100,6 +100,7 @@ class CloudinaryUploadHelper
             'file' => $curlFile,
             'folder' => $folder,
             'resource_type' => 'raw',
+            'format' => 'pdf',
         ];
 
         if (!empty($cfg['upload_preset'])) {
