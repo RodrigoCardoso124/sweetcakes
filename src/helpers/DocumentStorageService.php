@@ -397,6 +397,17 @@ class DocumentStorageService
             exit;
         }
 
+        if (CloudinaryUploadHelper::isUrlArmazenamento($url)) {
+            http_response_code(404);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode([
+                'message' => 'PDF não encontrado no Cloudinary. Volte a enviar o documento (receber pedido ou faturação).',
+                'hint' => 'O ficheiro pode ter sido apagado ou o upload falhou. Um novo envio após o deploy corrige o problema.',
+            ], JSON_UNESCAPED_UNICODE);
+
+            return;
+        }
+
         $err = null;
         $body = CloudinaryUploadHelper::downloadBytes($url, $err);
         if ($body === null) {

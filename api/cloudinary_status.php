@@ -27,7 +27,24 @@ if (!Auth::isLoggedIn()) {
 
 $cfg = CloudinaryUploadHelper::loadConfig();
 
-echo json_encode([
+$probeUrl = isset($_GET['url']) ? trim((string) $_GET['url']) : '';
+$probe = null;
+if ($probeUrl !== '' && preg_match('#^https?://#i', $probeUrl)) {
+    $parsed = CloudinaryUploadHelper::parseDeliveryUrl($probeUrl);
+    $meta = CloudinaryUploadHelper::adminFetchResource($probeUrl);
+    $probe = [
+        'url' => $probeUrl,
+        'parse_ok' => $parsed !== null,
+        'parsed' => $parsed,
+        'admin_found' => is_array($meta),
+        'admin_public_id' => $meta['public_id'] ?? null,
+        'admin_version' => $meta['version'] ?? null,
+        'admin_type' => $meta['type'] ?? null,
+        'browser_download_url' => CloudinaryUploadHelper::browserDownloadUrl($probeUrl),
+    ];
+}
+
+$payload = [
     'cloudinary' => [
         'enabled' => (bool) ($cfg['enabled'] ?? false),
         'cloud_name' => $cfg['cloud_name'] ?? null,
@@ -44,4 +61,10 @@ echo json_encode([
         'CLOUDINARY_API_SECRET' => !empty($_ENV['CLOUDINARY_API_SECRET']) || !empty($_SERVER['CLOUDINARY_API_SECRET']) || getenv('CLOUDINARY_API_SECRET'),
         'CLOUDINARY_FOLDER' => !empty($_ENV['CLOUDINARY_FOLDER']) || !empty($_SERVER['CLOUDINARY_FOLDER']) || getenv('CLOUDINARY_FOLDER'),
     ],
-], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+];
+
+if ($probe !== null) {
+    $payload['probe'] = $probe;
+}
+
+echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);

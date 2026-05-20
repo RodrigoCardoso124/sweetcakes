@@ -218,6 +218,12 @@ class CloudinaryUploadHelper
             return null;
         }
 
+        if (empty($decoded['public_id']) || (int) ($decoded['bytes'] ?? 0) <= 0) {
+            $error = 'Cloudinary não confirmou o PDF (resposta incompleta).';
+
+            return null;
+        }
+
         return (string) $decoded['secure_url'];
     }
 
@@ -232,14 +238,14 @@ class CloudinaryUploadHelper
     public static function parseDeliveryUrl(string $url): ?array
     {
         if (!preg_match(
-            '#res\.cloudinary\.com/([^/]+)/(raw|image)/(upload|authenticated|private)(?:/s--[^/]+--/)?(?:v(\d+)/)?(.+?)(?:\?.*)?$#i',
+            '#res\.cloudinary\.com/([^/]+)/(raw|image)/(upload|authenticated|private)(?:/s--[^/]+--/)?(?:/v(\d+))?/(.+?)(?:\?.*)?$#i',
             $url,
             $m
         )) {
             return null;
         }
 
-        $publicId = $m[5];
+        $publicId = ltrim($m[5], '/');
         while (preg_match('#^(?:fl_[^/]+|c_[^/]+|w_\d+|h_\d+)(?:,[^/]+)*/#', $publicId)) {
             $publicId = preg_replace('#^[^/]+/#', '', $publicId, 1);
         }
@@ -260,6 +266,28 @@ class CloudinaryUploadHelper
         return $p ? $p['public_id'] : null;
     }
 
+    /** public_id sem .pdf nem prefixo v123456/ (erro comum na API download). */
+    private static function sanitizePublicId(string $publicId): string
+    {
+        $publicId = trim($publicId, " \t\n\r\0\x0B/");
+        $publicId = preg_replace('/\.pdf$/i', '', $publicId);
+        $publicId = preg_replace('#^v\d+/#', '', $publicId);
+
+        return trim($publicId, '/');
+    }
+
+    private static function versionFromMetaOrUrl(?array $meta, ?array $parsed): ?string
+    {
+        if (is_array($meta) && isset($meta['version'])) {
+            return (string) $meta['version'];
+        }
+        if (is_array($parsed) && !empty($parsed['version'])) {
+            return (string) $parsed['version'];
+        }
+
+        return null;
+    }
+
     /**
      * Metadados via Admin API (public_id exacto, type, format).
      */
@@ -273,17 +301,22 @@ class CloudinaryUploadHelper
         }
 
         $apiId = preg_replace('/\.pdf$/i', '', $parsed['public_id']);
+        $apiId = self::sanitizePublicId($apiId);
         $idVariants = [$apiId];
+        $base = basename($apiId);
+        if ($base !== '' && $base !== $apiId) {
+            $idVariants[] = $base;
+        }
         if (preg_match('#^(.+)/faturacao/([^/]+)$#', $apiId, $fm)) {
             $idVariants[] = $fm[1] . '/' . $fm[2];
             $idVariants[] = 'sweet_cakes/produtos/' . $fm[2];
         }
-        $idVariants = array_values(array_unique($idVariants));
+        $idVariants = array_values(array_unique(array_filter($idVariants)));
 
         $types = array_values(array_unique([$parsed['delivery_type'], 'upload', 'authenticated', 'private']));
 
         foreach ($idVariants as $tryId) {
-            $encoded = str_replace('/', '%252F', $tryId);
+            $encoded = str_replace('/', '%2F', $tryId);
             foreach ($types as $type) {
                 $url = 'https://api.cloudinary.com/v1_1/' . $cloudName
                     . '/resources/' . $parsed['resource_type'] . '/' . $type . '/' . $encoded;
@@ -343,7 +376,8 @@ class CloudinaryUploadHelper
         string $publicId,
         string $format = 'pdf',
         string $resourceType = 'raw',
-        ?string $type = null
+        ?string $type = null,
+        ?string $version = null
     ): ?string {
         $cfg = self::loadConfig();
         $cloudName = self::resolveCloudName();
@@ -351,7 +385,11 @@ class CloudinaryUploadHelper
             return null;
         }
 
-        $publicId = preg_replace('/\.pdf$/i', '', $publicId);
+        $publicId = self::sanitizePublicId($publicId);
+        if ($publicId === '') {
+            return null;
+        }
+
         $timestamp = time();
         $params = [
             'format' => $format,
@@ -360,6 +398,9 @@ class CloudinaryUploadHelper
         ];
         if ($type !== null && $type !== '') {
             $params['type'] = $type;
+        }
+        if ($version !== null && $version !== '') {
+            $params['version'] = (string) $version;
         }
         $signature = self::apiSignature($params, (string) $cfg['api_secret']);
         $params['api_key'] = $cfg['api_key'];
@@ -415,7 +456,7 @@ class CloudinaryUploadHelper
         $deliveryType = $meta['type'] ?? $parsed['delivery_type'] ?? 'upload';
         $version = $parsed['version'] ?? (isset($meta['version']) ? (string) $meta['version'] : null);
 
-        $baseId = $meta['public_id'] ?? $parsed['public_id'] ?? '';
+        $baseId = self::sanitizePublicId((string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
         $format = $meta['format'] ?? 'pdf';
         $withExt = $baseId;
         if (!preg_match('/\.' . preg_quote($format, '/') . '$/i', $withExt)) {
@@ -473,40 +514,58 @@ class CloudinaryUploadHelper
         $parsed = self::parseDeliveryUrl($secureUrl);
         $meta = self::adminFetchResource($secureUrl);
 
-        $publicId = preg_replace(
-            '/\.pdf$/i',
-            '',
-            (string) ($meta['public_id'] ?? $parsed['public_id'] ?? '')
-        );
+        if (!is_array($meta)) {
+            if ($parsed === null) {
+                return null;
+            }
+            $publicId = self::sanitizePublicId($parsed['public_id']);
+            $format = 'pdf';
+            $resourceType = $parsed['resource_type'];
+            $version = $parsed['version'];
+            if ($publicId !== '' && !empty($cfg['api_secret'])) {
+                foreach (['upload', 'authenticated', null] as $type) {
+                    $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type, $version);
+                    if ($apiUrl !== null) {
+                        return $apiUrl;
+                    }
+                }
+            }
+            if (!empty($cfg['api_secret'])) {
+                $signed = self::signedDeliveryUrl($secureUrl, null);
+                if ($signed) {
+                    return $signed;
+                }
+            }
+
+            return self::normalizeDeliveryUrl($secureUrl);
+        }
+
+        $publicId = self::sanitizePublicId((string) ($meta['public_id'] ?? ''));
         $format = (string) ($meta['format'] ?? 'pdf');
-        $resourceType = (string) ($meta['resource_type'] ?? $parsed['resource_type'] ?? 'raw');
+        $resourceType = (string) ($meta['resource_type'] ?? 'raw');
+        $version = self::versionFromMetaOrUrl($meta, $parsed);
+        $base = (string) ($meta['secure_url'] ?? $secureUrl);
 
         if ($publicId !== '' && !empty($cfg['api_secret'])) {
             $types = array_values(array_unique(array_filter([
                 $meta['type'] ?? null,
-                $parsed['delivery_type'] ?? null,
                 'upload',
                 'authenticated',
                 null,
             ], static fn ($t) => $t !== '')));
             foreach ($types as $type) {
-                $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type);
+                $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type, $version);
                 if ($apiUrl !== null) {
                     return $apiUrl;
                 }
             }
         }
 
-        $base = (string) ($meta['secure_url'] ?? $secureUrl);
         if (!empty($cfg['api_secret'])) {
             $signedList = self::signedDeliveryUrlCandidates($base, $meta);
             if ($signedList !== []) {
                 return $signedList[0];
             }
-        }
-
-        if (($meta['access_mode'] ?? '') === 'public' && ($meta['type'] ?? 'upload') === 'upload') {
-            return self::normalizeDeliveryUrl($base, $meta);
         }
 
         return self::normalizeDeliveryUrl($base, $meta);
@@ -533,7 +592,7 @@ class CloudinaryUploadHelper
         $deliveryType = (string) ($meta['type'] ?? $parsed['delivery_type'] ?? 'authenticated');
         $version = $parsed['version'] ?? (isset($meta['version']) ? (string) $meta['version'] : null);
 
-        $baseId = preg_replace('/\.pdf$/i', '', (string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
+        $baseId = self::sanitizePublicId((string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
         $format = (string) ($meta['format'] ?? 'pdf');
         $withExt = $baseId . '.' . $format;
 
@@ -568,32 +627,27 @@ class CloudinaryUploadHelper
         $parsed = self::parseDeliveryUrl($secureUrl);
         $meta = self::adminFetchResource($secureUrl);
 
-        $publicId = preg_replace('/\.pdf$/i', '', (string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
+        $publicId = self::sanitizePublicId((string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
         $format = (string) ($meta['format'] ?? 'pdf');
         $resourceType = (string) ($meta['resource_type'] ?? $parsed['resource_type'] ?? 'raw');
         $deliveryType = (string) ($meta['type'] ?? $parsed['delivery_type'] ?? 'upload');
         $accessMode = (string) ($meta['access_mode'] ?? '');
+        $version = self::versionFromMetaOrUrl($meta, $parsed);
 
         $candidates = [];
 
-        $cdn = self::normalizeDeliveryUrl($secureUrl);
+        $cdn = self::normalizeDeliveryUrl($secureUrl, $meta);
         if ($accessMode === 'public' || $deliveryType === 'upload') {
             $candidates[] = ['url' => $cdn, 'api' => false];
             if (!empty($meta['secure_url'])) {
-                $candidates[] = ['url' => self::normalizeDeliveryUrl((string) $meta['secure_url']), 'api' => false];
+                $candidates[] = ['url' => self::normalizeDeliveryUrl((string) $meta['secure_url'], $meta), 'api' => false];
             }
         }
 
         if ($publicId !== '' && !empty($cfg['api_secret'])) {
-            $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $deliveryType);
+            $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $deliveryType, $version);
             if ($apiUrl) {
                 $candidates[] = ['url' => $apiUrl, 'api' => true];
-            }
-            if ($deliveryType !== 'authenticated') {
-                $apiUrl2 = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, 'authenticated');
-                if ($apiUrl2) {
-                    $candidates[] = ['url' => $apiUrl2, 'api' => true];
-                }
             }
         }
 
