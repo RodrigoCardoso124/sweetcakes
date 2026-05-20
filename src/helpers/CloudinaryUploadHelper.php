@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Upload de PDF/documentos para Cloudinary (obrigatório em Vercel — disco não persiste).
+ * Upload e download de PDF/documentos no Cloudinary (Vercel — disco não persiste).
  */
 class CloudinaryUploadHelper
 {
@@ -188,15 +188,98 @@ class CloudinaryUploadHelper
         return $p ? $p['public_id'] : null;
     }
 
-    private static function deliverySignatureComponent(string $toSign, string $apiSecret): string
+    /**
+     * Metadados via Admin API (public_id exacto, type, format).
+     */
+    public static function adminFetchResource(string $secureUrl): ?array
     {
-        $hash = sha1($toSign . $apiSecret, true);
-        $b64 = rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        $cfg = self::loadConfig();
+        if ($parsed === null || empty($cfg['api_key']) || empty($cfg['api_secret']) || empty($cfg['cloud_name'])) {
+            return null;
+        }
 
-        return 's--' . substr($b64, 0, 8) . '--';
+        $apiId = preg_replace('/\.pdf$/i', '', $parsed['public_id']);
+        $encoded = str_replace('/', '%252F', $apiId);
+        $types = array_unique([$parsed['delivery_type'], 'authenticated', 'upload', 'private']);
+
+        foreach ($types as $type) {
+            $url = 'https://api.cloudinary.com/v1_1/' . $cfg['cloud_name']
+                . '/resources/' . $parsed['resource_type'] . '/' . $type . '/' . $encoded;
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_USERPWD => $cfg['api_key'] . ':' . $cfg['api_secret'],
+                CURLOPT_TIMEOUT => 30,
+            ]);
+            $response = curl_exec($ch);
+            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($response && $code >= 200 && $code < 300) {
+                $data = json_decode($response, true);
+                if (is_array($data) && !empty($data['public_id'])) {
+                    return $data;
+                }
+            }
+        }
+
+        return null;
     }
 
-    public static function signedDeliveryUrl(string $secureUrl): ?string
+    /**
+     * Assinatura API (hex SHA-1) para endpoints como /raw/download.
+     */
+    private static function apiSignature(array $params, string $apiSecret): string
+    {
+        ksort($params);
+        $pairs = [];
+        foreach ($params as $k => $v) {
+            if ($v === null || $v === '') {
+                continue;
+            }
+            $pairs[] = $k . '=' . $v;
+        }
+
+        return sha1(implode('&', $pairs) . $apiSecret);
+    }
+
+    /**
+     * URL de download via API Cloudinary (funciona com authenticated/private).
+     * https://cloudinary.com/documentation/control_access_to_media#providing_time-limited_access_to_private_media_assets
+     */
+    public static function apiPrivateDownloadUrl(
+        string $publicId,
+        string $format = 'pdf',
+        string $resourceType = 'raw',
+        string $type = 'authenticated'
+    ): ?string {
+        $cfg = self::loadConfig();
+        if (empty($cfg['api_key']) || empty($cfg['api_secret']) || empty($cfg['cloud_name'])) {
+            return null;
+        }
+
+        $publicId = preg_replace('/\.pdf$/i', '', $publicId);
+        $timestamp = time();
+        $params = [
+            'format' => $format,
+            'public_id' => $publicId,
+            'timestamp' => (string) $timestamp,
+            'type' => $type,
+        ];
+        $signature = self::apiSignature($params, (string) $cfg['api_secret']);
+        $params['api_key'] = $cfg['api_key'];
+        $params['signature'] = $signature;
+
+        return 'https://api.cloudinary.com/v1_1/' . $cfg['cloud_name']
+            . '/' . $resourceType . '/download?' . http_build_query($params);
+    }
+
+    /**
+     * URL de entrega assinada (s--xxxx--) — algoritmo oficial Cloudinary PHP SDK.
+     */
+    public static function signedDeliveryUrl(string $secureUrl, ?array $meta = null): ?string
     {
         $cfg = self::loadConfig();
         if (empty($cfg['api_secret'])) {
@@ -204,22 +287,30 @@ class CloudinaryUploadHelper
         }
 
         $parsed = self::parseDeliveryUrl($secureUrl);
-        if ($parsed === null) {
+        if ($parsed === null && $meta === null) {
             return null;
         }
 
-        $publicId = $parsed['public_id'];
-        if ($parsed['resource_type'] === 'raw' && !preg_match('/\.pdf$/i', $publicId)) {
-            $publicId .= '.pdf';
+        $cloud = $parsed['cloud'] ?? ($cfg['cloud_name'] ?? '');
+        $resourceType = $parsed['resource_type'] ?? 'raw';
+        $deliveryType = $meta['type'] ?? $parsed['delivery_type'] ?? 'upload';
+        $version = $parsed['version'] ?? (isset($meta['version']) ? (string) $meta['version'] : null);
+
+        $publicId = $meta['public_id'] ?? $parsed['public_id'] ?? '';
+        $format = $meta['format'] ?? 'pdf';
+        if (!preg_match('/\.' . preg_quote($format, '/') . '$/i', $publicId)) {
+            $publicId .= '.' . $format;
         }
 
-        $sig = self::deliverySignatureComponent($publicId, (string) $cfg['api_secret']);
-        $vPart = $parsed['version'] !== null ? 'v' . $parsed['version'] . '/' : '';
+        $hash = sha1($publicId . $cfg['api_secret'], true);
+        $b64 = rtrim(strtr(base64_encode($hash), '+/', '-_'), '=');
+        $sig = 's--' . substr($b64, 0, 8) . '--';
+        $vPart = $version !== null && $version !== '' ? 'v' . $version . '/' : '';
 
         return 'https://res.cloudinary.com/'
-            . $parsed['cloud'] . '/'
-            . $parsed['resource_type'] . '/'
-            . $parsed['delivery_type'] . '/'
+            . $cloud . '/'
+            . $resourceType . '/'
+            . $deliveryType . '/'
             . $sig
             . $vPart
             . $publicId;
@@ -227,11 +318,31 @@ class CloudinaryUploadHelper
 
     public static function downloadBytes(string $secureUrl, ?string &$error = null): ?string
     {
-        $parsed = self::parseDeliveryUrl($secureUrl);
         $cfg = self::loadConfig();
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        $meta = self::adminFetchResource($secureUrl);
+
+        $publicId = $meta['public_id'] ?? ($parsed['public_id'] ?? '');
+        $format = $meta['format'] ?? 'pdf';
+        $resourceType = $meta['resource_type'] ?? ($parsed['resource_type'] ?? 'raw');
+        $deliveryType = $meta['type'] ?? ($parsed['delivery_type'] ?? 'upload');
+
+        if ($publicId !== '' && !empty($cfg['api_secret'])) {
+            $types = array_unique([$deliveryType, 'authenticated', 'upload', 'private']);
+            foreach ($types as $type) {
+                $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type);
+                if ($apiUrl === null) {
+                    continue;
+                }
+                $body = self::downloadBytesDirect($apiUrl, $errApi);
+                if ($body !== null) {
+                    return $body;
+                }
+            }
+        }
 
         if ($parsed !== null && in_array($parsed['delivery_type'], ['authenticated', 'private'], true)) {
-            $signed = self::signedDeliveryUrl($secureUrl);
+            $signed = self::signedDeliveryUrl($secureUrl, $meta);
             if ($signed !== null) {
                 $body = self::downloadBytesDirect($signed, $errSigned);
                 if ($body !== null) {
@@ -247,7 +358,7 @@ class CloudinaryUploadHelper
         }
 
         if (!empty($cfg['api_secret'])) {
-            $signed = self::signedDeliveryUrl($secureUrl);
+            $signed = self::signedDeliveryUrl($secureUrl, $meta);
             if ($signed !== null && $signed !== $secureUrl) {
                 $body = self::downloadBytesDirect($signed, $errSigned2);
                 if ($body !== null) {
@@ -255,13 +366,11 @@ class CloudinaryUploadHelper
                 }
                 $error = $errSigned2 ?: $errDirect;
             }
+        } else {
+            $error = ($error ?: $errDirect) . ' — falta CLOUDINARY_API_SECRET no Vercel';
         }
 
-        if (empty($cfg['api_secret'])) {
-            $error = ($error ?: $errDirect) . ' — configure CLOUDINARY_API_SECRET no Vercel';
-        } else {
-            $error = $error ?: $errDirect;
-        }
+        $error = $error ?: $errDirect;
 
         return null;
     }

@@ -509,22 +509,15 @@ class LucroCalculator
         return array_slice($out, 0, $limit);
     }
 
-    private static function tableExists(PDO $db, string $table): bool
-
+    public static function tableExists(PDO $db, string $table): bool
     {
-
         $stmt = $db->prepare(
-
             'SELECT COUNT(*) FROM information_schema.TABLES
-
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t'
-
         );
-
         $stmt->execute([':t' => $table]);
 
         return (int) $stmt->fetchColumn() > 0;
-
     }
 
 

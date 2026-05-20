@@ -66,6 +66,9 @@ class FaturacaoIntegracaoService
 
     public static function sincronizarDespesa(PDO $db, int $despesaId, ?float $taxaIva = null): array
     {
+        if (!FaturacaoService::tabelasOk($db)) {
+            return ['skipped' => true, 'hint' => 'migrate_009'];
+        }
         if (!LucroCalculator::tableExists($db, 'despesas')) {
             return ['skipped' => true];
         }
