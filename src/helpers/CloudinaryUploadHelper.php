@@ -274,9 +274,9 @@ class CloudinaryUploadHelper
 
         $apiId = preg_replace('/\.pdf$/i', '', $parsed['public_id']);
         $encoded = str_replace('/', '%252F', $apiId);
-        $types = array_unique([$parsed['delivery_type'], 'authenticated', 'upload', 'private']);
+        $types = array_values(array_unique([$parsed['delivery_type'], 'upload', 'authenticated']));
 
-        foreach ($types as $type) {
+        foreach (array_slice($types, 0, 2) as $type) {
             $url = 'https://api.cloudinary.com/v1_1/' . $cloudName
                 . '/resources/' . $parsed['resource_type'] . '/' . $type . '/' . $encoded;
 
@@ -284,7 +284,7 @@ class CloudinaryUploadHelper
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_USERPWD => $cfg['api_key'] . ':' . $cfg['api_secret'],
-                CURLOPT_TIMEOUT => 30,
+                CURLOPT_TIMEOUT => 12,
             ]);
             $response = curl_exec($ch);
             $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -345,7 +345,6 @@ class CloudinaryUploadHelper
         $publicId = preg_replace('/\.pdf$/i', '', $publicId);
         $timestamp = time();
         $params = [
-            'attachment' => '1',
             'format' => $format,
             'public_id' => $publicId,
             'timestamp' => (string) $timestamp,
@@ -424,56 +423,9 @@ class CloudinaryUploadHelper
         );
     }
 
-    /**
-     * @return string[]
-     */
-    private static function signedDeliveryUrlVariants(string $secureUrl, ?array $meta): array
+    private static function looksLikePdf(?string $body): bool
     {
-        $cfg = self::loadConfig();
-        if (empty($cfg['api_secret'])) {
-            return [];
-        }
-        $parsed = self::parseDeliveryUrl($secureUrl);
-        if ($parsed === null && $meta === null) {
-            return [];
-        }
-
-        $cloud = $parsed['cloud'] ?? self::resolveCloudName($secureUrl) ?? '';
-        $resourceType = $parsed['resource_type'] ?? 'raw';
-        $version = $parsed['version'] ?? (isset($meta['version']) ? (string) $meta['version'] : null);
-        $baseId = preg_replace('/\.pdf$/i', '', $meta['public_id'] ?? $parsed['public_id'] ?? '');
-        $format = $meta['format'] ?? 'pdf';
-        $withExt = $baseId . '.' . $format;
-
-        $types = array_unique([
-            $meta['type'] ?? $parsed['delivery_type'] ?? 'upload',
-            'authenticated',
-            'private',
-            'upload',
-        ]);
-
-        $toSignList = [$withExt, $baseId, 'fl_attachment/' . $withExt];
-        if ($version !== null && $version !== '') {
-            $toSignList[] = 'v' . $version . '/' . $withExt;
-            $toSignList[] = 'v' . $version . '/' . $baseId;
-            $toSignList[] = 'fl_attachment/v' . $version . '/' . $withExt;
-        }
-
-        $urls = [];
-        foreach ($types as $deliveryType) {
-            foreach ($toSignList as $toSign) {
-                $urls[] = self::buildSignedDeliveryUrl(
-                    $cloud,
-                    $resourceType,
-                    $deliveryType,
-                    $version,
-                    $toSign,
-                    (string) $cfg['api_secret']
-                );
-            }
-        }
-
-        return array_values(array_unique($urls));
+        return $body !== null && strlen($body) > 50 && strncmp($body, '%PDF', 4) === 0;
     }
 
     public static function downloadBytes(string $secureUrl, ?string &$error = null): ?string
@@ -482,43 +434,51 @@ class CloudinaryUploadHelper
         $parsed = self::parseDeliveryUrl($secureUrl);
         $meta = self::adminFetchResource($secureUrl);
 
-        $publicId = $meta['public_id'] ?? ($parsed['public_id'] ?? '');
-        $format = $meta['format'] ?? 'pdf';
-        $resourceType = $meta['resource_type'] ?? ($parsed['resource_type'] ?? 'raw');
-        $deliveryType = $meta['type'] ?? ($parsed['delivery_type'] ?? 'upload');
+        $publicId = preg_replace('/\.pdf$/i', '', (string) ($meta['public_id'] ?? $parsed['public_id'] ?? ''));
+        $format = (string) ($meta['format'] ?? 'pdf');
+        $resourceType = (string) ($meta['resource_type'] ?? $parsed['resource_type'] ?? 'raw');
+        $deliveryType = (string) ($meta['type'] ?? $parsed['delivery_type'] ?? 'upload');
+        $accessMode = (string) ($meta['access_mode'] ?? '');
+
+        $candidates = [];
+
+        if ($accessMode === 'public' || $deliveryType === 'upload') {
+            $candidates[] = ['url' => $secureUrl, 'api' => false];
+            if (!empty($meta['secure_url']) && $meta['secure_url'] !== $secureUrl) {
+                $candidates[] = ['url' => $meta['secure_url'], 'api' => false];
+            }
+        }
 
         if ($publicId !== '' && !empty($cfg['api_secret'])) {
-            $apiTypes = [null, 'private', 'authenticated', 'upload'];
-            foreach ($apiTypes as $type) {
-                $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type);
-                if ($apiUrl === null) {
-                    continue;
+            $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $deliveryType);
+            if ($apiUrl) {
+                $candidates[] = ['url' => $apiUrl, 'api' => true];
+            }
+            if ($deliveryType !== 'authenticated') {
+                $apiUrl2 = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, 'authenticated');
+                if ($apiUrl2) {
+                    $candidates[] = ['url' => $apiUrl2, 'api' => true];
                 }
-                $body = self::downloadBytesDirect($apiUrl, $errApi, true);
-                if ($body !== null) {
-                    return $body;
-                }
-                $error = $errApi;
             }
         }
 
-        foreach (self::signedDeliveryUrlVariants($secureUrl, $meta) as $signed) {
-            $body = self::downloadBytesDirect($signed, $errSigned);
-            if ($body !== null) {
+        $signed = self::signedDeliveryUrl($secureUrl, $meta);
+        if ($signed) {
+            $candidates[] = ['url' => $signed, 'api' => false];
+        }
+
+        $lastErr = null;
+        foreach ($candidates as $c) {
+            $body = self::downloadBytesDirect($c['url'], $err, !empty($c['api']));
+            if (self::looksLikePdf($body)) {
                 return $body;
             }
-            $error = $errSigned;
+            $lastErr = $err;
         }
 
-        $body = self::downloadBytesDirect($secureUrl, $errDirect);
-        if ($body !== null) {
-            return $body;
-        }
-
+        $error = $lastErr ?: 'Não foi possível obter o PDF do Cloudinary';
         if (!empty($cfg['missing'])) {
-            $error = ($error ?: $errDirect) . ' — ' . self::configErrorMessage();
-        } else {
-            $error = $error ?: $errDirect;
+            $error .= ' — ' . self::configErrorMessage();
         }
 
         return null;
@@ -534,7 +494,8 @@ class CloudinaryUploadHelper
         $opts = [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 90,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_SSL_VERIFYPEER => true,
         ];
         if ($apiAuth || strpos($url, 'api.cloudinary.com') !== false) {

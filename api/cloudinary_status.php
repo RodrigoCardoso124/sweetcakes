@@ -14,7 +14,13 @@ Auth::startSession();
 
 if (!Auth::isLoggedIn()) {
     http_response_code(401);
-    echo json_encode(['message' => 'Inicie sessão no painel admin']);
+    echo json_encode([
+        'message' => 'Sessão não ativa.',
+        'hint' => 'Faça login no painel admin. Depois abra este URL com o token: '
+            . '/api/cloudinary_status.php?access_token=COLE_AQUI_o_valor_de_localStorage_apiSessionId '
+            . '(F12 → Application → Local Storage → apiSessionId).',
+        'alternativa' => 'Na consola do painel (F12): API.getSessionInfo() — após deploy inclui cloudinary.',
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
     exit;
 }

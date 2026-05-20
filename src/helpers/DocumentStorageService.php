@@ -384,7 +384,11 @@ class DocumentStorageService
         if ($body === null) {
             http_response_code(502);
             header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['message' => $err ?: 'Não foi possível obter o PDF do armazenamento']);
+            $payload = ['message' => $err ?: 'Não foi possível obter o PDF do armazenamento'];
+            if (defined('APP_DEBUG') && APP_DEBUG) {
+                $payload['url_origem'] = $url;
+            }
+            echo json_encode($payload, JSON_UNESCAPED_UNICODE);
 
             return;
         }
