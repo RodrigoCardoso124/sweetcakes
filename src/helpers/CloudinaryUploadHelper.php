@@ -273,27 +273,36 @@ class CloudinaryUploadHelper
         }
 
         $apiId = preg_replace('/\.pdf$/i', '', $parsed['public_id']);
-        $encoded = str_replace('/', '%252F', $apiId);
-        $types = array_values(array_unique([$parsed['delivery_type'], 'upload', 'authenticated']));
+        $idVariants = [$apiId];
+        if (preg_match('#^(.+)/faturacao/([^/]+)$#', $apiId, $fm)) {
+            $idVariants[] = $fm[1] . '/' . $fm[2];
+            $idVariants[] = 'sweet_cakes/produtos/' . $fm[2];
+        }
+        $idVariants = array_values(array_unique($idVariants));
 
-        foreach (array_slice($types, 0, 2) as $type) {
-            $url = 'https://api.cloudinary.com/v1_1/' . $cloudName
-                . '/resources/' . $parsed['resource_type'] . '/' . $type . '/' . $encoded;
+        $types = array_values(array_unique([$parsed['delivery_type'], 'upload', 'authenticated', 'private']));
 
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_USERPWD => $cfg['api_key'] . ':' . $cfg['api_secret'],
-                CURLOPT_TIMEOUT => 12,
-            ]);
-            $response = curl_exec($ch);
-            $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+        foreach ($idVariants as $tryId) {
+            $encoded = str_replace('/', '%252F', $tryId);
+            foreach ($types as $type) {
+                $url = 'https://api.cloudinary.com/v1_1/' . $cloudName
+                    . '/resources/' . $parsed['resource_type'] . '/' . $type . '/' . $encoded;
 
-            if ($response && $code >= 200 && $code < 300) {
-                $data = json_decode($response, true);
-                if (is_array($data) && !empty($data['public_id'])) {
-                    return $data;
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_USERPWD => $cfg['api_key'] . ':' . $cfg['api_secret'],
+                    CURLOPT_TIMEOUT => 10,
+                ]);
+                $response = curl_exec($ch);
+                $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($response && $code >= 200 && $code < 300) {
+                    $data = json_decode($response, true);
+                    if (is_array($data) && !empty($data['public_id'])) {
+                        return $data;
+                    }
                 }
             }
         }
@@ -424,44 +433,85 @@ class CloudinaryUploadHelper
     }
 
     /**
-     * URL para o browser abrir o PDF (API Cloudinary assinada ou CDN).
-     * Não faz download no servidor — evita timeout 502 no Vercel.
+     * Reconstrói URL CDN com extensão .pdf (raw sem .pdf na URL dá "Resource not found").
+     */
+    public static function normalizeDeliveryUrl(string $secureUrl): string
+    {
+        $parsed = self::parseDeliveryUrl($secureUrl);
+        if ($parsed === null) {
+            if (!preg_match('/\.pdf$/i', $secureUrl)) {
+                return preg_replace('/(\?[^#]*)?$/', '.pdf$1', $secureUrl);
+            }
+
+            return $secureUrl;
+        }
+
+        $publicId = $parsed['public_id'];
+        if ($parsed['resource_type'] === 'raw' && !preg_match('/\.pdf$/i', $publicId)) {
+            $publicId .= '.pdf';
+        }
+
+        $vPart = $parsed['version'] !== null && $parsed['version'] !== ''
+            ? 'v' . $parsed['version'] . '/'
+            : '';
+
+        return 'https://res.cloudinary.com/'
+            . $parsed['cloud'] . '/'
+            . $parsed['resource_type'] . '/'
+            . $parsed['delivery_type'] . '/'
+            . $vPart
+            . $publicId;
+    }
+
+    /**
+     * URL para o browser (CDN ou assinada). Evita redirect para api.cloudinary.com/.../download (JSON de erro).
      */
     public static function browserDownloadUrl(string $secureUrl): ?string
     {
         $cfg = self::loadConfig();
         $parsed = self::parseDeliveryUrl($secureUrl);
+
+        $meta = self::adminFetchResource($secureUrl);
+        if (is_array($meta) && !empty($meta['secure_url'])) {
+            $canonical = (string) $meta['secure_url'];
+            if (($meta['access_mode'] ?? '') === 'public' && ($meta['type'] ?? '') === 'upload') {
+                return self::normalizeDeliveryUrl($canonical);
+            }
+            if (!empty($cfg['api_secret'])) {
+                $signed = self::signedDeliveryUrl($canonical, $meta);
+                if ($signed !== null) {
+                    return $signed;
+                }
+            }
+
+            return self::normalizeDeliveryUrl($canonical);
+        }
+
         if ($parsed === null) {
             return $secureUrl;
         }
 
-        $publicId = preg_replace('/\.pdf$/i', '', $parsed['public_id']);
+        $cdn = self::normalizeDeliveryUrl($secureUrl);
 
-        if ($publicId !== '' && !empty($cfg['api_secret'])) {
-            $types = array_values(array_unique([
-                $parsed['delivery_type'],
-                'upload',
-                'authenticated',
-                null,
-            ]));
-            foreach ($types as $type) {
-                $apiUrl = self::apiPrivateDownloadUrl(
-                    $publicId,
-                    'pdf',
-                    $parsed['resource_type'],
-                    $type
-                );
-                if ($apiUrl !== null) {
-                    return $apiUrl;
+        if ($parsed['delivery_type'] === 'upload') {
+            if (!empty($cfg['api_secret'])) {
+                $signed = self::signedDeliveryUrl($cdn);
+                if ($signed !== null) {
+                    return $signed;
                 }
             }
-            $signed = self::signedDeliveryUrl($secureUrl);
+
+            return $cdn;
+        }
+
+        if (!empty($cfg['api_secret'])) {
+            $signed = self::signedDeliveryUrl($cdn, $meta);
             if ($signed !== null) {
                 return $signed;
             }
         }
 
-        return $secureUrl;
+        return $cdn;
     }
 
     private static function looksLikePdf(?string $body): bool
@@ -483,10 +533,11 @@ class CloudinaryUploadHelper
 
         $candidates = [];
 
+        $cdn = self::normalizeDeliveryUrl($secureUrl);
         if ($accessMode === 'public' || $deliveryType === 'upload') {
-            $candidates[] = ['url' => $secureUrl, 'api' => false];
-            if (!empty($meta['secure_url']) && $meta['secure_url'] !== $secureUrl) {
-                $candidates[] = ['url' => $meta['secure_url'], 'api' => false];
+            $candidates[] = ['url' => $cdn, 'api' => false];
+            if (!empty($meta['secure_url'])) {
+                $candidates[] = ['url' => self::normalizeDeliveryUrl((string) $meta['secure_url']), 'api' => false];
             }
         }
 
