@@ -386,41 +386,8 @@ class DocumentStorageService
         exit;
     }
 
-    private static function enviarConteudoRemoto(string $url, array $row, bool $inline): void
+    private static function enviarPdfBytes(string $body, array $row, bool $inline): void
     {
-        self::limparBuffersResposta();
-
-        $dest = CloudinaryUploadHelper::browserDownloadUrl($url);
-        if ($dest !== null && $dest !== '') {
-            header('Cache-Control: private, max-age=300');
-            header('Location: ' . $dest, true, 302);
-            exit;
-        }
-
-        if (CloudinaryUploadHelper::isUrlArmazenamento($url)) {
-            http_response_code(404);
-            header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode([
-                'message' => 'PDF não encontrado no Cloudinary. Volte a enviar o documento (receber pedido ou faturação).',
-                'hint' => 'O ficheiro pode ter sido apagado ou o upload falhou. Um novo envio após o deploy corrige o problema.',
-            ], JSON_UNESCAPED_UNICODE);
-
-            return;
-        }
-
-        $err = null;
-        $body = CloudinaryUploadHelper::downloadBytes($url, $err);
-        if ($body === null) {
-            http_response_code(502);
-            header('Content-Type: application/json; charset=UTF-8');
-            $payload = ['message' => $err ?: 'Não foi possível obter o PDF do armazenamento'];
-            if (defined('APP_DEBUG') && APP_DEBUG) {
-                $payload['url_origem'] = $url;
-            }
-            echo json_encode($payload, JSON_UNESCAPED_UNICODE);
-
-            return;
-        }
         $nome = (string) ($row['nome_original'] ?? 'documento.pdf');
         $mime = (string) ($row['mime_type'] ?? 'application/pdf');
         $disp = $inline ? 'inline' : 'attachment';
@@ -431,6 +398,45 @@ class DocumentStorageService
         header('Cache-Control: private, max-age=3600');
         echo $body;
         exit;
+    }
+
+    private static function enviarConteudoRemoto(string $url, array $row, bool $inline): void
+    {
+        self::limparBuffersResposta();
+
+        $err = null;
+        $body = CloudinaryUploadHelper::downloadBytes($url, $err);
+        if ($body !== null) {
+            self::enviarPdfBytes($body, $row, $inline);
+
+            return;
+        }
+
+        $dest = CloudinaryUploadHelper::browserDownloadUrl($url);
+        if ($dest !== null && $dest !== '' && CloudinaryUploadHelper::isCdnDeliveryUrl($dest)) {
+            header('Cache-Control: private, max-age=300');
+            header('Location: ' . $dest, true, 302);
+            exit;
+        }
+
+        if (CloudinaryUploadHelper::isUrlArmazenamento($url)) {
+            http_response_code(502);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode([
+                'message' => $err ?: 'Não foi possível obter o PDF do Cloudinary.',
+                'hint' => 'Confirme CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET no Vercel (par da mesma conta). Se o erro persistir, volte a enviar o PDF.',
+            ], JSON_UNESCAPED_UNICODE);
+
+            return;
+        }
+
+        http_response_code(502);
+        header('Content-Type: application/json; charset=UTF-8');
+        $payload = ['message' => $err ?: 'Não foi possível obter o PDF do armazenamento'];
+        if (defined('APP_DEBUG') && APP_DEBUG) {
+            $payload['url_origem'] = $url;
+        }
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     }
 
     public static function anexarMetadados(PDO $db, string $tipo, array $rows): array

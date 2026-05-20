@@ -83,7 +83,18 @@ class CloudinaryUploadHelper
             $cfg['missing'][] = 'CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET (ou CLOUDINARY_UPLOAD_PRESET)';
         }
 
+        foreach (['cloud_name', 'api_key', 'api_secret', 'upload_preset'] as $k) {
+            if (!empty($cfg[$k]) && is_string($cfg[$k])) {
+                $cfg[$k] = trim($cfg[$k]);
+            }
+        }
+
         return $cfg;
+    }
+
+    public static function isCdnDeliveryUrl(string $url): bool
+    {
+        return stripos($url, 'res.cloudinary.com') !== false;
     }
 
     /** Cloud name da config ou extraído do secure_url guardado na BD. */
@@ -344,7 +355,7 @@ class CloudinaryUploadHelper
     }
 
     /**
-     * String para assinar pedidos API (Cloudinary signature v2).
+     * String para assinar pedidos API (formato Cloudinary v1 — igual ao upload assinado).
      */
     private static function apiStringToSign(array $params): string
     {
@@ -358,7 +369,7 @@ class CloudinaryUploadHelper
         ksort($filtered);
         $parts = [];
         foreach ($filtered as $k => $v) {
-            $parts[] = str_replace('&', '%26', $k . '=' . $v);
+            $parts[] = $k . '=' . $v;
         }
 
         return implode('&', $parts);
@@ -408,6 +419,37 @@ class CloudinaryUploadHelper
 
         return 'https://api.cloudinary.com/v1_1/' . $cloudName
             . '/' . $resourceType . '/download?' . http_build_query($params);
+    }
+
+    /**
+     * URL de download API sem assinatura na query — usar só no servidor com Basic Auth (api_key:api_secret).
+     */
+    public static function apiDownloadUrlPlain(
+        string $publicId,
+        string $format = 'pdf',
+        string $resourceType = 'raw',
+        ?string $type = null,
+        ?string $version = null
+    ): ?string {
+        $cloudName = self::resolveCloudName();
+        $publicId = self::sanitizePublicId($publicId);
+        if (empty($cloudName) || $publicId === '') {
+            return null;
+        }
+
+        $q = [
+            'public_id' => $publicId,
+            'format' => $format,
+        ];
+        if ($type !== null && $type !== '') {
+            $q['type'] = $type;
+        }
+        if ($version !== null && $version !== '') {
+            $q['version'] = (string) $version;
+        }
+
+        return 'https://api.cloudinary.com/v1_1/' . $cloudName
+            . '/' . $resourceType . '/download?' . http_build_query($q);
     }
 
     private static function buildSignedDeliveryUrl(
@@ -505,61 +547,14 @@ class CloudinaryUploadHelper
     }
 
     /**
-     * URL para o browser abrir o PDF.
-     * Prioridade: API /raw/download (funciona com authenticated) → CDN assinada → CDN directa.
+     * URL para o browser abrir o PDF (só CDN res.cloudinary.com — nunca api.cloudinary.com com assinatura).
      */
     public static function browserDownloadUrl(string $secureUrl): ?string
     {
         $cfg = self::loadConfig();
         $parsed = self::parseDeliveryUrl($secureUrl);
         $meta = self::adminFetchResource($secureUrl);
-
-        if (!is_array($meta)) {
-            if ($parsed === null) {
-                return null;
-            }
-            $publicId = self::sanitizePublicId($parsed['public_id']);
-            $format = 'pdf';
-            $resourceType = $parsed['resource_type'];
-            $version = $parsed['version'];
-            if ($publicId !== '' && !empty($cfg['api_secret'])) {
-                foreach (['upload', 'authenticated', null] as $type) {
-                    $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type, $version);
-                    if ($apiUrl !== null) {
-                        return $apiUrl;
-                    }
-                }
-            }
-            if (!empty($cfg['api_secret'])) {
-                $signed = self::signedDeliveryUrl($secureUrl, null);
-                if ($signed) {
-                    return $signed;
-                }
-            }
-
-            return self::normalizeDeliveryUrl($secureUrl);
-        }
-
-        $publicId = self::sanitizePublicId((string) ($meta['public_id'] ?? ''));
-        $format = (string) ($meta['format'] ?? 'pdf');
-        $resourceType = (string) ($meta['resource_type'] ?? 'raw');
-        $version = self::versionFromMetaOrUrl($meta, $parsed);
-        $base = (string) ($meta['secure_url'] ?? $secureUrl);
-
-        if ($publicId !== '' && !empty($cfg['api_secret'])) {
-            $types = array_values(array_unique(array_filter([
-                $meta['type'] ?? null,
-                'upload',
-                'authenticated',
-                null,
-            ], static fn ($t) => $t !== '')));
-            foreach ($types as $type) {
-                $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $type, $version);
-                if ($apiUrl !== null) {
-                    return $apiUrl;
-                }
-            }
-        }
+        $base = (string) (is_array($meta) ? ($meta['secure_url'] ?? $secureUrl) : $secureUrl);
 
         if (!empty($cfg['api_secret'])) {
             $signedList = self::signedDeliveryUrlCandidates($base, $meta);
@@ -636,24 +631,27 @@ class CloudinaryUploadHelper
 
         $candidates = [];
 
+        foreach (self::signedDeliveryUrlCandidates($secureUrl, $meta) as $signedUrl) {
+            $candidates[] = ['url' => $signedUrl, 'api' => false];
+        }
+
+        if ($publicId !== '' && !empty($cfg['api_key']) && !empty($cfg['api_secret'])) {
+            foreach (array_values(array_unique([$deliveryType, 'upload', 'authenticated'])) as $tryType) {
+                $plain = self::apiDownloadUrlPlain($publicId, $format, $resourceType, $tryType, $version);
+                if ($plain) {
+                    $candidates[] = ['url' => $plain, 'api' => true];
+                }
+            }
+            $apiSigned = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $deliveryType, $version);
+            if ($apiSigned) {
+                $candidates[] = ['url' => $apiSigned, 'api' => true];
+            }
+        }
+
         $cdn = self::normalizeDeliveryUrl($secureUrl, $meta);
-        if ($accessMode === 'public' || $deliveryType === 'upload') {
-            $candidates[] = ['url' => $cdn, 'api' => false];
-            if (!empty($meta['secure_url'])) {
-                $candidates[] = ['url' => self::normalizeDeliveryUrl((string) $meta['secure_url'], $meta), 'api' => false];
-            }
-        }
-
-        if ($publicId !== '' && !empty($cfg['api_secret'])) {
-            $apiUrl = self::apiPrivateDownloadUrl($publicId, $format, $resourceType, $deliveryType, $version);
-            if ($apiUrl) {
-                $candidates[] = ['url' => $apiUrl, 'api' => true];
-            }
-        }
-
-        $signed = self::signedDeliveryUrl($secureUrl, $meta);
-        if ($signed) {
-            $candidates[] = ['url' => $signed, 'api' => false];
+        $candidates[] = ['url' => $cdn, 'api' => false];
+        if (is_array($meta) && !empty($meta['secure_url'])) {
+            $candidates[] = ['url' => self::normalizeDeliveryUrl((string) $meta['secure_url'], $meta), 'api' => false];
         }
 
         $lastErr = null;
