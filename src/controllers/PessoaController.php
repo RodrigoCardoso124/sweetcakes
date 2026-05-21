@@ -15,7 +15,9 @@ class PessoaController
 
     public function index()
     {
-        $stmt = $this->pessoa->getAll();
+        $apenasClientes = isset($_GET['apenas_clientes'])
+            && in_array(strtolower((string) $_GET['apenas_clientes']), ['1', 'true', 'yes'], true);
+        $stmt = $apenasClientes ? $this->pessoa->getAllApenasClientes() : $this->pessoa->getAll();
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
@@ -118,6 +120,19 @@ class PessoaController
 
     public function destroy($id)
     {
+        $chk = $this->db->prepare(
+            'SELECT funcionario_id FROM funcionarios WHERE pessoas_pessoa_id = :id LIMIT 1'
+        );
+        $chk->execute([':id' => (int) $id]);
+        if ($chk->fetch(PDO::FETCH_ASSOC)) {
+            http_response_code(400);
+            echo json_encode([
+                'message' => 'Esta pessoa é funcionária. Remova primeiro em Funcionários.',
+            ]);
+
+            return;
+        }
+
         $this->pessoa->pessoa_id = $id;
 
         if ($this->pessoa->delete()) {

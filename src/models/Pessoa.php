@@ -22,6 +22,20 @@ class Pessoa {
         return $stmt;
     }
 
+    /** Pessoas que não são funcionários (lista de clientes no painel). */
+    public function getAllApenasClientes() {
+        $query = "SELECT p.*
+                  FROM {$this->table} p
+                  WHERE NOT EXISTS (
+                      SELECT 1 FROM funcionarios f
+                      WHERE f.pessoas_pessoa_id = p.pessoa_id
+                  )
+                  ORDER BY p.nome ASC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt;
+    }
+
     public function getById() {
         $query = "SELECT * FROM {$this->table} WHERE pessoa_id = :id LIMIT 1";
         $stmt  = $this->conn->prepare($query);

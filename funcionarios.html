@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
     <title>Gestão de Funcionários - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -83,16 +82,37 @@
             <h3 id="modalTitle">Novo Funcionário</h3>
             <form id="funcionarioForm">
                 <input type="hidden" id="funcionarioId">
-                <div class="form-group">
-                    <label for="pessoaSelect">Cliente *</label>
-                    <select id="pessoaSelect" name="pessoa_id" required>
-                        <option value="">Selecione um cliente...</option>
-                    </select>
-                    <small style="color: #666; font-size: 12px;">O funcionário deve ser criado a partir de um cliente existente</small>
+                <p class="page-intro" id="funcionarioFormHint" style="margin-bottom:16px;">
+                    Cria o funcionário com dados próprios. Não precisa de estar na lista de clientes.
+                </p>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="funcNome">Nome *</label>
+                        <input type="text" id="funcNome" maxlength="120" required autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                        <label for="funcEmail">Email (login) *</label>
+                        <input type="email" id="funcEmail" maxlength="255" required autocomplete="email">
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="funcTelemovel">Telemóvel</label>
+                        <input type="text" id="funcTelemovel" maxlength="30" autocomplete="tel">
+                    </div>
+                    <div class="form-group">
+                        <label for="funcCargo">Cargo *</label>
+                        <input type="text" id="funcCargo" name="cargo" placeholder="Ex: Administrador, Pasteleira" required>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="cargo">Cargo *</label>
-                    <input type="text" id="cargo" name="cargo" placeholder="Ex: Administrador, Vendedor, etc." required>
+                    <label for="funcMorada">Morada</label>
+                    <input type="text" id="funcMorada" maxlength="255">
+                </div>
+                <div class="form-group" id="funcPasswordGroup">
+                    <label for="funcPassword">Password do painel *</label>
+                    <input type="password" id="funcPassword" minlength="8" autocomplete="new-password">
+                    <small class="muted" id="funcPasswordHelp">Mínimo 8 caracteres. Usada para entrar no painel administrativo.</small>
                 </div>
                 <div class="modal-actions">
                     <button type="submit" class="btn btn-success">Guardar</button>

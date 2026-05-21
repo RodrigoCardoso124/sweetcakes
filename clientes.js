@@ -44,7 +44,7 @@ async function loadClientes() {
     tbody.innerHTML = '<tr><td colspan="8" class="loading">Carregando clientes...</td></tr>';
 
     try {
-        allClientes = await API.getPessoas();
+        allClientes = await API.getClientes();
         clientesFiltrados = allClientes.slice();
         renderClientes(clientesFiltrados);
         updateStats(allClientes);

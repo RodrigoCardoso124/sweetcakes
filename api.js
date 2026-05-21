@@ -184,8 +184,14 @@ const API = {
         return apiRequest(`pessoas/${id}`);
     },
 
-    async getPessoas() {
-        return apiRequest('pessoas');
+    async getPessoas(opts) {
+        const apenasClientes = opts && opts.apenasClientes === true;
+        const q = apenasClientes ? '?apenas_clientes=1' : '';
+        return apiRequest('pessoas' + q);
+    },
+
+    async getClientes() {
+        return apiRequest('pessoas?apenas_clientes=1');
     },
 
     // Produtos
