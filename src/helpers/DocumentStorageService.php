@@ -91,7 +91,7 @@ class DocumentStorageService
         ?int $criadoPor = null
     ): array {
         if (!self::tabelasOk($db)) {
-            return ['error' => 'Execute /api/migrate_012_documentos.php', 'code' => 503];
+            return ['error' => 'Arquivo de documentos não instalado na base de dados.', 'code' => 503];
         }
         if (!in_array($tipoDocumento, self::TIPOS_DOC, true)) {
             return ['error' => 'tipo_documento inválido', 'code' => 400];
@@ -144,7 +144,7 @@ class DocumentStorageService
         ?int $criadoPor = null
     ): array {
         if (!self::tabelasOk($db)) {
-            return ['error' => 'Execute /api/migrate_012_documentos.php', 'code' => 503];
+            return ['error' => 'Arquivo de documentos não instalado na base de dados.', 'code' => 503];
         }
         if (!in_array($mime, array_keys(self::MIME_PERMITIDOS), true)) {
             $mime = 'application/pdf';
@@ -185,7 +185,7 @@ class DocumentStorageService
         if (self::usarArmazenamentoBd($db)) {
             if (!self::colunaConteudoOk($db)) {
                 return [
-                    'error' => 'Execute /api/migrate_013_documento_conteudo.php no browser (uma vez)',
+                    'error' => 'Arquivo de documentos na BD não configurado (migração 013).',
                     'code' => 503,
                 ];
             }
@@ -398,7 +398,7 @@ class DocumentStorageService
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode([
             'message' => 'PDF em falta. Volte a enviar o documento (Receber pedido ou Faturação).',
-            'hint' => 'Se ainda não correu a migração: /api/migrate_013_documento_conteudo.php',
+            'hint' => 'Volte a enviar o PDF. Se persistir, contacte o administrador.',
         ], JSON_UNESCAPED_UNICODE);
     }
 

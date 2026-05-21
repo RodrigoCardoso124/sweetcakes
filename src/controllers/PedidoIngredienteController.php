@@ -233,7 +233,7 @@ class PedidoIngredienteController
                         http_response_code(400);
                         echo json_encode([
                             'message' => $fiscal['error'],
-                            'hint' => 'Execute /api/migrate_009_faturacao.php no Vercel',
+                            'hint' => 'Módulo de faturação em falta na base de dados.',
                         ], JSON_UNESCAPED_UNICODE);
 
                         return;
@@ -250,7 +250,7 @@ class PedidoIngredienteController
                             'pedido_id' => (int) $id,
                             'estado' => $estado,
                             'fiscal' => $fiscal,
-                            'hint' => 'Abra no browser: /api/migrate_012_documentos.php e /api/migrate_013_documento_conteudo.php',
+                            'hint' => 'Módulo de arquivo de PDFs em falta na base de dados.',
                         ], JSON_UNESCAPED_UNICODE);
 
                         return;
@@ -268,7 +268,7 @@ class PedidoIngredienteController
                         http_response_code($arquivo['code'] ?? 500);
                         echo json_encode([
                             'message' => $arquivo['error'],
-                            'hint' => 'Execute /api/migrate_013_documento_conteudo.php — PDFs guardam-se na base de dados.',
+                            'hint' => 'Não foi possível guardar o PDF. Tente outra vez.',
                             'fiscal' => $fiscal,
                         ], JSON_UNESCAPED_UNICODE);
 

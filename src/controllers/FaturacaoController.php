@@ -19,7 +19,7 @@ class FaturacaoController
         if (!FaturacaoService::tabelasOk($this->db)) {
             http_response_code(503);
             echo json_encode([
-                'message' => 'Módulo de faturação não instalado. Execute /api/migrate_009_faturacao.php',
+                'message' => 'Módulo de faturação não instalado na base de dados.',
             ], JSON_UNESCAPED_UNICODE);
 
             return;
@@ -84,11 +84,10 @@ class FaturacaoController
                 break;
 
             case 'config':
-                require_once __DIR__ . '/../helpers/CloudinaryUploadHelper.php';
                 echo json_encode([
                     'config' => FaturacaoService::getConfig($this->db),
                     'pdf_disponivel' => file_exists(dirname(__DIR__, 2) . '/vendor/autoload.php'),
-                    'cloudinary_ativo' => CloudinaryUploadHelper::isEnabled(),
+                    'documentos_na_bd' => true,
                 ], JSON_UNESCAPED_UNICODE);
                 break;
 

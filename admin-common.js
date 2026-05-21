@@ -135,6 +135,7 @@ function applyRoleVisibility() {
   document.querySelectorAll('[data-admin-only="true"]').forEach(function (el) {
     if (!isAdmin) el.style.display = 'none';
   });
+  hideEmptyNavGroups();
 }
 
 async function bindAdminLogout(buttonId) {
@@ -149,41 +150,119 @@ async function bindAdminLogout(buttonId) {
   });
 }
 
-/** Menu lateral único — mesma ordem e links em todas as páginas do painel. */
-var ADMIN_NAV_ITEMS = [
-  { href: 'index.html', icon: '📦', label: 'Encomendas' },
-  { href: 'clientes.html', icon: '👥', label: 'Clientes', adminOnly: true },
-  { href: 'produtos.html', icon: '🍰', label: 'Produtos' },
-  { href: 'promocoes.html', icon: '🎁', label: 'Promoções', adminOnly: true },
-  { href: 'funcionarios.html', icon: '👔', label: 'Funcionários', adminOnly: true },
-  { href: 'estatisticas.html', icon: '📊', label: 'Estatísticas', adminOnly: true },
-  { href: 'despesas.html', icon: '💸', label: 'Despesas', adminOnly: true },
-  { href: 'fornecedores.html', icon: '🏢', label: 'Fornecedores', adminOnly: true },
-  { href: 'faturacao.html', icon: '🧾', label: 'Faturação', adminOnly: true },
-  { href: 'producao.html', icon: '🏭', label: 'Produção' },
-  { href: 'receitas.html', icon: '📋', label: 'Receitas', adminOnly: true },
-  { href: 'materiais-stock.html', icon: '🧂', label: 'Materiais', adminOnly: true }
+/** Menu lateral — grupos lógicos (única fonte de verdade em todas as páginas). */
+var ADMIN_NAV_GROUPS = [
+  {
+    id: 'operacao',
+    label: 'Operação',
+    items: [
+      { href: 'index.html', label: 'Encomendas', short: 'En', icon: 'orders' },
+      { href: 'producao.html', label: 'Produção', short: 'Pr', icon: 'production' }
+    ]
+  },
+  {
+    id: 'catalogo',
+    label: 'Catálogo',
+    items: [
+      { href: 'produtos.html', label: 'Produtos', short: 'Pd', icon: 'products' },
+      { href: 'promocoes.html', label: 'Promoções', short: 'Pm', icon: 'promo', adminOnly: true }
+    ]
+  },
+  {
+    id: 'pessoas',
+    label: 'Pessoas',
+    items: [
+      { href: 'clientes.html', label: 'Clientes', short: 'Cl', icon: 'clients', adminOnly: true },
+      { href: 'funcionarios.html', label: 'Funcionários', short: 'Fn', icon: 'staff', adminOnly: true }
+    ]
+  },
+  {
+    id: 'stock',
+    label: 'Stock e receitas',
+    items: [
+      { href: 'materiais-stock.html', label: 'Materiais', short: 'Mt', icon: 'stock', adminOnly: true },
+      { href: 'receitas.html', label: 'Receitas', short: 'Rc', icon: 'recipes', adminOnly: true }
+    ]
+  },
+  {
+    id: 'financas',
+    label: 'Finanças',
+    items: [
+      { href: 'faturacao.html', label: 'Faturação', short: 'Ft', icon: 'invoice', adminOnly: true },
+      { href: 'despesas.html', label: 'Despesas', short: 'Ds', icon: 'expenses', adminOnly: true },
+      { href: 'fornecedores.html', label: 'Fornecedores', short: 'Fr', icon: 'suppliers', adminOnly: true }
+    ]
+  },
+  {
+    id: 'analise',
+    label: 'Análise',
+    items: [
+      { href: 'estatisticas.html', label: 'Estatísticas', short: 'Es', icon: 'stats', adminOnly: true }
+    ]
+  }
 ];
+
+function normalizeSidebarBrand() {
+  var header = document.querySelector('.sidebar-header');
+  if (!header || header.getAttribute('data-brand-ready') === '1') return;
+  header.setAttribute('data-brand-ready', '1');
+  header.innerHTML =
+    '<div class="brand-mark"><img src="assets/logo.png" alt="" width="40" height="40" decoding="async"></div>' +
+    '<div class="brand-text">' +
+    '<span class="brand-name">Sweet Cakes</span>' +
+    '<span class="brand-tagline">Painel administrativo</span>' +
+    '</div>';
+}
 
 function buildAdminSidebarNav() {
   var nav = document.querySelector('.sidebar-nav');
   if (!nav) return;
 
   nav.innerHTML = '';
-  ADMIN_NAV_ITEMS.forEach(function (item) {
-    var a = document.createElement('a');
-    a.href = item.href;
-    a.className = 'nav-item';
-    if (item.adminOnly) {
-      a.setAttribute('data-admin-only', 'true');
-    }
-    a.innerHTML =
-      '<span class="icon">' +
-      item.icon +
-      '</span><span class="nav-label">' +
-      item.label +
-      '</span>';
-    nav.appendChild(a);
+  ADMIN_NAV_GROUPS.forEach(function (group) {
+    var section = document.createElement('div');
+    section.className = 'nav-group';
+    section.setAttribute('data-nav-group', group.id);
+
+    var title = document.createElement('h3');
+    title.className = 'nav-group-label';
+    title.textContent = group.label;
+    section.appendChild(title);
+
+    var list = document.createElement('div');
+    list.className = 'nav-group-items';
+
+    group.items.forEach(function (item) {
+      var a = document.createElement('a');
+      a.href = item.href;
+      a.className = 'nav-item';
+      if (item.adminOnly) {
+        a.setAttribute('data-admin-only', 'true');
+      }
+      a.innerHTML =
+        '<span class="nav-icon nav-icon--' +
+        item.icon +
+        '" aria-hidden="true">' +
+        item.short +
+        '</span><span class="nav-label">' +
+        item.label +
+        '</span>';
+      list.appendChild(a);
+    });
+
+    section.appendChild(list);
+    nav.appendChild(section);
+  });
+}
+
+function hideEmptyNavGroups() {
+  document.querySelectorAll('.nav-group').forEach(function (group) {
+    var links = group.querySelectorAll('.nav-item');
+    var visible = 0;
+    links.forEach(function (a) {
+      if (a.style.display !== 'none') visible++;
+    });
+    group.style.display = visible > 0 ? '' : 'none';
   });
 }
 
@@ -242,6 +321,7 @@ function initAdminMobileNav() {
 function initAdminShell() {
   if (!requireAdminPageAuth()) return false;
   if (!enforcePageRole()) return false;
+  normalizeSidebarBrand();
   buildAdminSidebarNav();
   applyRoleVisibility();
   initSidebarNavActive();

@@ -18,3 +18,8 @@ Thumbs.db
 
 # 5. Dependências (se chegares a usar o Composer no PHP)
 vendor/
+
+# 6. Scripts expostos na web (não voltar a commitar)
+api/test_*.php
+api/cloudinary_status.php
+api/migrate_*.php

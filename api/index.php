@@ -355,18 +355,6 @@ if ($resource === 'session' && $httpMethod === 'GET') {
         'is_funcionario' => Auth::isFuncionario(),
         'is_admin' => $isAdmin,
     ];
-    if ($isAdmin) {
-        require_once __DIR__ . '/../src/helpers/CloudinaryUploadHelper.php';
-        $cfg = CloudinaryUploadHelper::loadConfig();
-        $out['cloudinary'] = [
-            'enabled' => (bool) ($cfg['enabled'] ?? false),
-            'cloud_name' => $cfg['cloud_name'] ?? null,
-            'folder_pdfs' => $cfg['folder'] ?? null,
-            'has_api_key' => !empty($cfg['api_key']),
-            'has_api_secret' => !empty($cfg['api_secret']),
-            'missing' => $cfg['missing'] ?? [],
-        ];
-    }
     echo json_encode($out, JSON_UNESCAPED_UNICODE);
     exit();
 }

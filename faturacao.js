@@ -149,13 +149,7 @@ async function loadConfig() {
 function atualizarBannerArmazenamento(cfg) {
   const el = document.getElementById('fatPdfBanner');
   if (!el) return;
-  if (cfg.cloudinary_ativo) {
-    el.classList.add('hidden-banner');
-    return;
-  }
-  el.textContent =
-    'PDFs são guardados no Cloudinary em produção. Confirme CLOUDINARY_CLOUD_NAME e CLOUDINARY_UPLOAD_PRESET (ou API key/secret) nas variáveis do projeto Vercel.';
-  el.classList.remove('hidden-banner');
+  el.classList.add('hidden-banner');
 }
 
 async function loadAll() {
@@ -167,7 +161,7 @@ async function loadAll() {
     const msg = e.message || String(e);
     if (banner && (msg.indexOf('503') !== -1 || msg.indexOf('009') !== -1 || msg.indexOf('012') !== -1)) {
       banner.textContent =
-        'Execute no Vercel: /api/migrate_009_faturacao.php e /api/migrate_012_documentos.php';
+        'Módulo de faturação ou arquivo de documentos em falta. Contacte o administrador.';
       banner.classList.remove('hidden-banner');
     }
     if (typeof showToast === 'function') showToast(msg, 'warning');

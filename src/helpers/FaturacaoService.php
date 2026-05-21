@@ -109,7 +109,7 @@ class FaturacaoService
     public static function emitir(PDO $db, array $data): array
     {
         if (!self::tabelasOk($db)) {
-            return ['error' => 'Execute a migração 009: /api/migrate_009_faturacao.php', 'code' => 503];
+            return ['error' => 'Módulo de faturação não instalado na base de dados.', 'code' => 503];
         }
 
         $taxaPadrao = self::taxaFromInput($data['taxa_iva_pct'] ?? null);
