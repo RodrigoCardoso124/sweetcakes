@@ -150,9 +150,9 @@ function renderIng(list) {
         i.quantidade_minima +
         '"></td><td>' +
         escapeHtml(i.unidade || '') +
-        '</td><td><button type="button" class="btn btn-primary btn-sm" data-save="' +
+        '</td><td><button type="button" class="btn btn-success btn-sm" data-save="' +
         i.ingrediente_id +
-        '">Guardar</button></td><td><button type="button" class="btn btn-secondary btn-sm" data-ped="' +
+        '">Guardar</button></td><td><button type="button" class="btn btn-info btn-sm" data-ped="' +
         i.ingrediente_id +
         '">Pedir</button></td></tr>'
       );
@@ -251,7 +251,7 @@ function renderPed(list) {
       if (p.estado === 'recebido') {
         if (p.tem_ficheiro) {
           faturaCell =
-            '<button type="button" class="btn btn-primary btn-sm" data-abrir-fat="' +
+            '<button type="button" class="btn btn-info btn-sm" data-abrir-fat="' +
             p.pedido_id +
             '">Abrir fatura</button>';
           if (p.num_fatura) {
@@ -280,15 +280,15 @@ function renderPed(list) {
         faturaCell +
         '</td><td>' +
         escapeHtml((p.criado_em || '').substring(0, 16)) +
-        '</td><td>' +
+        '</td><td class="col-actions"><div class="actions-group">' +
         (p.estado === 'pendente'
-          ? '<button class="btn btn-primary btn-sm" data-rec="' +
+          ? '<button class="btn btn-success btn-sm" data-rec="' +
             p.pedido_id +
-            '">Receber</button> <button class="btn btn-secondary btn-sm" data-can="' +
+            '">Receber</button><button class="btn btn-secondary btn-sm" data-can="' +
             p.pedido_id +
             '">Cancelar</button>'
-          : '') +
-        '</td></tr>'
+          : '<span class="muted">—</span>') +
+        '</div></td></tr>'
       );
     })
     .join('');

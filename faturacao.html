@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
     <title>Faturação e IVA - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -59,7 +58,7 @@
                 <section id="panel-compras" class="fat-panel fat-panel--active admin-section">
                     <h3 class="section-title">Compras e documentos de fornecedor</h3>
                     <p class="muted section-note">Lista de faturas/despesas registadas. Use <strong>Abrir ficheiro</strong> para ver o PDF.</p>
-                    <details class="info-card info-card--medium fat-details-form">
+                    <details class="info-card panel-card--full fat-details-form">
                         <summary>Registar novo documento</summary>
                         <div class="form-row-2">
                             <div class="form-group">
@@ -112,7 +111,7 @@
                             <label for="recPdf">PDF do documento *</label>
                             <input type="file" id="recPdf" accept="application/pdf,.pdf" class="form-select">
                         </div>
-                        <button type="button" id="recAddBtn" class="btn btn-primary">Registar compra</button>
+                        <button type="button" id="recAddBtn" class="btn btn-success">Registar compra</button>
                     </details>
                     <div class="table-wrap">
                         <table class="orders-table" id="tblRecebidas">
@@ -123,7 +122,7 @@
                                     <th>NIF</th>
                                     <th>Total</th>
                                     <th>Documento</th>
-                                    <th></th>
+                                    <th class="col-actions">Ações</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -143,7 +142,7 @@
                                     <th>NIF</th>
                                     <th>Total</th>
                                     <th>Fatura pedida</th>
-                                    <th></th>
+                                    <th class="col-actions">Ações</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -163,7 +162,7 @@
                                     <th>Total</th>
                                     <th>Encomenda</th>
                                     <th>Documento</th>
-                                    <th></th>
+                                    <th class="col-actions">Ações</th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -185,7 +184,7 @@
                 </section>
 
                 <section id="panel-empresa" class="fat-panel admin-section">
-                    <div class="info-card info-card--narrow">
+                    <div class="info-card panel-card--full">
                         <p class="muted">Aparecem nas faturas e no export CSV.</p>
                         <div class="form-group">
                             <label for="cfgNome">Nome / denominação</label>
@@ -211,7 +210,7 @@
                                 <option value="6">6%</option>
                             </select>
                         </div>
-                        <button type="button" id="cfgSaveBtn" class="btn btn-primary">Guardar</button>
+                        <button type="button" id="cfgSaveBtn" class="btn btn-success">Guardar</button>
                     </div>
                 </section>
             </div>

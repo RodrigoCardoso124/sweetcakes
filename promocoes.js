@@ -2,7 +2,9 @@
 let allPromocoes = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('adminLoggedIn') !== 'true' || !localStorage.getItem('adminFuncionarioId')) {
+    if (typeof initAdminShell === 'function') {
+        if (initAdminShell() === false) return;
+    } else if (localStorage.getItem('adminLoggedIn') !== 'true' || !localStorage.getItem('adminFuncionarioId')) {
         window.location.href = 'login.html';
         return;
     }
@@ -11,15 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        localStorage.removeItem('adminLoggedIn');
-        localStorage.removeItem('adminEmail');
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminFuncionarioId');
-        localStorage.removeItem('apiSessionId');
-        window.location.href = 'login.html';
-    });
-
     document.getElementById('refreshBtn').addEventListener('click', loadPromocoes);
     document.getElementById('addPromocaoBtn').addEventListener('click', () => openModal());
 
@@ -111,8 +104,8 @@ function renderCard(p, nowMs) {
                 <div style="grid-column: span 2;">Período: <strong>${formatDate(p.data_inicio)} → ${formatDate(p.data_fim)}</strong></div>
             </div>
             <div class="promo-actions">
-                <button class="btn btn-secondary" onclick="editPromocao(${p.promocao_id})">Editar</button>
-                <button class="btn btn-danger" onclick="deletePromocao(${p.promocao_id})">Apagar</button>
+                <button class="btn btn-warning btn-sm" onclick="editPromocao(${p.promocao_id})">Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="deletePromocao(${p.promocao_id})">Apagar</button>
             </div>
         </div>
     `;

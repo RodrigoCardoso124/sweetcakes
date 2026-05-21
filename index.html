@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
     <title>Painel de Administração - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -45,11 +44,6 @@
             <section id="dashPanelOperacao" class="dash-panel" aria-labelledby="tabOperacao">
                 <p class="page-intro">Aqui aparecem só encomendas <strong>em curso</strong> (pendente → pronta). Altera estados e abre o detalhe sem misturar encomendas já fechadas.</p>
 
-                <div class="filters-toolbar">
-                    <select id="statusFilter" class="filter-select" aria-label="Filtrar por estado"></select>
-                    <input type="search" id="searchInput" class="search-input" placeholder="Pesquisar por ID ou cliente…" autocomplete="off">
-                </div>
-
                 <div class="stats-grid stats-grid--pipeline">
                     <div class="stat-card stat-card--compact">
                         <div class="stat-icon" aria-hidden="true">⏳</div>
@@ -81,6 +75,11 @@
                     </div>
                 </div>
 
+                <div class="filters-toolbar filters-toolbar--table">
+                    <select id="statusFilter" class="filter-select" aria-label="Filtrar por estado"></select>
+                    <input type="search" id="searchInput" class="search-input" placeholder="Pesquisar por ID ou cliente…" autocomplete="off">
+                </div>
+
                 <div class="table-card">
                     <div class="table-card__head">
                         <h3 class="table-card__title">Fila de trabalho</h3>
@@ -95,7 +94,7 @@
                                     <th>Total</th>
                                     <th>Estado</th>
                                     <th>Data</th>
-                                    <th>Ações</th>
+                                    <th class="col-actions">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="ordersTableBody">
@@ -142,7 +141,7 @@
                                     <th>Total</th>
                                     <th>Estado</th>
                                     <th>Data</th>
-                                    <th>Ações</th>
+                                    <th class="col-actions">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="ordersTableBodyHistorico">
@@ -167,7 +166,7 @@
             <select id="newStatusSelect" class="form-select"></select>
             <div class="modal-actions">
                 <button id="cancelStatusBtn" type="button" class="btn btn-secondary">Cancelar</button>
-                <button id="confirmStatusBtn" type="button" class="btn btn-primary">Guardar</button>
+                <button id="confirmStatusBtn" type="button" class="btn btn-success">Guardar</button>
             </div>
         </div>
     </div>

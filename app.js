@@ -290,18 +290,18 @@ function renderEncomendas(encomendas, view) {
         '<td class="cell-date">' +
         formatDate(encomenda.data_criacao || new Date().toISOString()) +
         '</td>' +
-        '<td class="actions-cell">' +
+        '<td class="col-actions"><div class="actions-group">' +
         '<a href="encomenda.html?id=' +
         encomenda.encomenda_id +
-        '" class="action-btn view">Ver</a>' +
+        '" class="btn btn-info btn-sm">Ver</a>' +
         (currentUserCanManageOrders
-          ? '<button type="button" class="action-btn edit" data-eid="' +
+          ? '<button type="button" class="btn btn-warning btn-sm" data-eid="' +
             encomenda.encomenda_id +
             '" data-estado="' +
             est +
             '">Estado</button>'
           : '') +
-        '</td>' +
+        '</div></td>' +
         '</tr>'
       );
     })
@@ -310,7 +310,7 @@ function renderEncomendas(encomendas, view) {
   renderPagination(pagination, page, totalPages, handler);
 
   if (currentUserCanManageOrders) {
-    tbody.querySelectorAll('.action-btn.edit').forEach((btn) => {
+    tbody.querySelectorAll('button[data-eid]').forEach((btn) => {
       btn.addEventListener('click', () => {
         openStatusModal(parseInt(btn.getAttribute('data-eid'), 10), btn.getAttribute('data-estado'));
       });

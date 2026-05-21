@@ -82,12 +82,11 @@ function renderTabela(list) {
       let acoes = '<span class="muted">—</span>';
       if (podeEditar) {
         acoes =
-          '<button type="button" class="btn btn-secondary btn-sm" data-edit-desp="' +
+          '<div class="actions-group"><button type="button" class="btn btn-warning btn-sm" data-edit-desp="' +
           m.despesa_id +
-          '">Editar</button> ' +
-          '<button type="button" class="btn btn-danger btn-sm" data-del-desp="' +
+          '">Editar</button><button type="button" class="btn btn-danger btn-sm" data-del-desp="' +
           m.despesa_id +
-          '">Apagar</button>';
+          '">Apagar</button></div>';
       }
       return (
         '<tr><td>' +
@@ -99,7 +98,7 @@ function renderTabela(list) {
         (m.detalhe ? ' <span class="muted">' + escapeHtml(m.detalhe) + '</span>' : '') +
         '</td><td>' +
         fmtEuro(m.valor) +
-        '</td><td>' +
+        '</td><td class="col-actions">' +
         acoes +
         '</td></tr>'
       );

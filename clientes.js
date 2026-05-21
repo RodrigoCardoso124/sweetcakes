@@ -82,10 +82,10 @@ function renderClientes(clientes) {
                 <td>${escapeHtml(cliente.nif || '—')}</td>
                 <td>${escapeHtml(cliente.morada || 'N/A')}</td>
                 <td>${dataRegisto}</td>
-                <td class="actions-cell">
-                    <button class="action-btn edit" onclick="editCliente(${cliente.pessoa_id})">Editar</button>
-                    <button class="action-btn delete" onclick="deleteCliente(${cliente.pessoa_id})" style="background: var(--danger);">Apagar</button>
-                </td>
+                <td class="col-actions"><div class="actions-group">
+                    <button class="btn btn-warning btn-sm" onclick="editCliente(${cliente.pessoa_id})">Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteCliente(${cliente.pessoa_id})">Apagar</button>
+                </div></td>
             </tr>
         `;
     }).join('');

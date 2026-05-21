@@ -164,8 +164,8 @@ function renderProdutos(produtos) {
                     ${
                         isElevatedPainel()
                             ? `<div class="product-actions">
-                        <button class="btn btn-secondary" onclick="editProduto(${produto.produto_id})">Editar</button>
-                        <button class="btn btn-danger" onclick="deleteProduto(${produto.produto_id})">Apagar</button>
+                        <button class="btn btn-warning btn-sm" onclick="editProduto(${produto.produto_id})">Editar</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteProduto(${produto.produto_id})">Apagar</button>
                     </div>`
                             : ''
                     }

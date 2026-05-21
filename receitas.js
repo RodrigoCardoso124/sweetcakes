@@ -103,11 +103,11 @@ function renderTable() {
         x.rendimento +
         '</td><td>' +
         (parseInt(x.ativo, 10) ? 'Sim' : 'Não') +
-        '</td><td><button class="btn btn-secondary btn-sm" data-edit="' +
+        '</td><td class="col-actions"><div class="actions-group"><button class="btn btn-warning btn-sm" data-edit="' +
         x.receita_id +
-        '">Editar</button> <button class="btn btn-danger btn-sm" data-del="' +
+        '">Editar</button><button class="btn btn-danger btn-sm" data-del="' +
         x.receita_id +
-        '">Apagar</button></td></tr>'
+        '">Apagar</button></div></td></tr>'
       );
     })
     .join('');

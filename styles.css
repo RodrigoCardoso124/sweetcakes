@@ -460,12 +460,46 @@ body {
 
 .btn-success {
     background: var(--success);
-    color: white;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background: #267a40;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.btn-warning {
+    background: var(--warning);
+    color: #fff;
+}
+
+.btn-warning:hover {
+    background: #a85a0f;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.btn-info {
+    background: var(--info);
+    color: #fff;
+}
+
+.btn-info:hover {
+    background: #236a9a;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
 }
 
 .btn-danger {
     background: var(--danger);
-    color: white;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #a83232;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
 }
 
 .btn-block {
@@ -622,34 +656,33 @@ body {
     color: #721c24;
 }
 
-/* Actions */
-.actions-cell {
-    display: flex;
-    gap: 8px;
+/* Coluna de ações nas tabelas — sem flex no <td> (parte o alinhamento) */
+.orders-table th.col-actions,
+.orders-table td.col-actions {
+    width: 10.5rem;
+    min-width: 10.5rem;
+    max-width: 12rem;
+    vertical-align: middle;
+    text-align: left;
+    white-space: nowrap;
 }
 
-.action-btn {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.3s;
+.actions-group,
+.actions-cell .actions-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-start;
 }
 
-.action-btn.view {
-    background: var(--info);
-    color: white;
-}
-
-.action-btn.edit {
-    background: var(--warning);
-    color: white;
-}
-
-.action-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow);
+/* Legado: células que ainda usam só .actions-cell */
+td.actions-cell:not(.col-actions) {
+    vertical-align: middle;
+    white-space: nowrap;
+    width: 10.5rem;
+    min-width: 10.5rem;
+    text-align: left;
 }
 
 /* Modal */
@@ -1938,6 +1971,10 @@ textarea:focus {
     margin-bottom: 20px;
 }
 
+.admin-section .info-card.panel-card--full {
+    padding: 22px 24px;
+}
+
 .form-actions-inline {
     display: flex;
     flex-wrap: wrap;
@@ -1954,6 +1991,104 @@ textarea:focus {
     flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 16px;
+}
+
+/* —— Botões semânticos (mesma cor = mesma acção em todo o painel) —— */
+/* primary: criar / nova / acção principal da página */
+/* success: guardar, criar, confirmar */
+/* warning: editar, alterar estado */
+/* info: ver, pedir, abrir, registar pedido */
+/* danger: apagar, anular */
+/* secondary: cancelar, atualizar, exportar */
+
+.filters-toolbar--table {
+    margin-top: 0;
+    margin-bottom: 14px;
+}
+
+.panel-card--full {
+    max-width: none;
+    width: 100%;
+}
+
+.form-grid-wide {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    gap: 16px 20px;
+    margin-bottom: 18px;
+}
+
+@media (min-width: 900px) {
+    .form-grid-wide {
+        grid-template-columns: 2fr 1fr 1fr 1fr;
+    }
+}
+
+.panel-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 12px;
+    margin-top: 4px;
+    border-top: 1px solid var(--border-color);
+}
+
+.panel-card__actions--flush {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 8px;
+}
+
+.actions-cell .btn-sm,
+.actions-group .btn-sm {
+    white-space: nowrap;
+}
+
+/* —— Layout: usar bem a largura em todas as páginas —— */
+.main-content,
+.page-content-stack {
+    width: 100%;
+    max-width: none;
+}
+
+.admin-section {
+    width: 100%;
+}
+
+.admin-section > .info-card,
+.admin-section > .info-card--narrow,
+.admin-section > .info-card--medium,
+.admin-section > .panel-card--full,
+.admin-section > details.info-card {
+    max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.filters,
+.filters-toolbar {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.table-wrap,
+.table-container,
+.table-card {
+    width: 100%;
+    max-width: none;
+}
+
+.form-row-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 16px 20px;
+}
+
+.cards-responsive,
+.promos-grid,
+.products-grid {
+    width: 100%;
 }
 
 motion {
@@ -2003,12 +2138,10 @@ motion {
     margin-bottom: 12px;
 }
 
-.info-card--narrow {
-    max-width: 720px;
-}
-
+.info-card--narrow,
 .info-card--medium {
-    max-width: 800px;
+    max-width: none;
+    width: 100%;
 }
 
 .preview-msg {

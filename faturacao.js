@@ -65,7 +65,7 @@ function botaoAbrirFicheiro(item) {
     return '<span class="muted">Sem PDF</span>';
   }
   return (
-    '<button type="button" class="btn btn-primary btn-sm" data-abrir-ficheiro="' +
+    '<button type="button" class="btn btn-info btn-sm" data-abrir-ficheiro="' +
     fid +
     '">Abrir ficheiro</button>'
   );
@@ -181,7 +181,7 @@ async function loadCompras() {
   tb.innerHTML = list
     .map((x) => {
       const uploadBtn = !x.tem_ficheiro
-        ? ' <button type="button" class="btn btn-secondary btn-sm" data-upload-doc data-upload-tipo="recebida" data-upload-id="' +
+        ? ' <button type="button" class="btn btn-info btn-sm" data-upload-doc data-upload-tipo="recebida" data-upload-id="' +
           x.recebida_id +
           '">Anexar PDF</button>'
         : '';
@@ -199,9 +199,9 @@ async function loadCompras() {
         '</td><td>' +
         botaoAbrirFicheiro(x) +
         uploadBtn +
-        '</td><td><button type="button" class="btn btn-danger btn-sm" data-del-rec="' +
+        '</td><td class="col-actions"><div class="actions-group"><button type="button" class="btn btn-danger btn-sm" data-del-rec="' +
         x.recebida_id +
-        '">Apagar</button></td></tr>'
+        '">Apagar</button></div></td></tr>'
       );
     })
     .join('');
@@ -234,9 +234,9 @@ async function loadPendentes() {
         fmtEuro(e.total) +
         '</td><td>' +
         pediu +
-        '</td><td><button type="button" class="btn btn-primary btn-sm" data-emitir-enc="' +
+        '</td><td class="col-actions"><div class="actions-group"><button type="button" class="btn btn-primary btn-sm" data-emitir-enc="' +
         e.encomenda_id +
-        '">Emitir fatura</button></td></tr>'
+        '">Emitir fatura</button></div></td></tr>'
       );
     })
     .join('');
@@ -262,7 +262,7 @@ async function loadEmitidas() {
     .map((f) => {
       const doc = f.serie + ' ' + f.numero + '/' + (f.data_emissao || '').slice(0, 4);
       const uploadBtn = !f.tem_ficheiro
-        ? ' <button type="button" class="btn btn-secondary btn-sm" data-upload-doc data-upload-tipo="emitida" data-upload-id="' +
+        ? ' <button type="button" class="btn btn-info btn-sm" data-upload-doc data-upload-tipo="emitida" data-upload-id="' +
           f.fatura_id +
           '">Anexar PDF</button>'
         : '';
@@ -284,9 +284,9 @@ async function loadEmitidas() {
         '</td><td>' +
         botaoAbrirFicheiro(f) +
         uploadBtn +
-        '</td><td>' +
+        '</td><td class="col-actions"><div class="actions-group">' +
         anul +
-        '</td></tr>'
+        '</div></td></tr>'
       );
     })
     .join('');

@@ -111,10 +111,10 @@ function renderFuncionarios(funcionarios) {
                 <td>${escapeHtml(pessoa.email || 'N/A')}</td>
                 <td>${escapeHtml(func.cargo || 'N/A')}</td>
                 <td>${dataEntrada}</td>
-                <td class="actions-cell">
-                    <button class="action-btn edit" onclick="editFuncionario(${func.funcionario_id})">Editar</button>
-                    <button class="action-btn delete" onclick="deleteFuncionario(${func.funcionario_id})" style="background: var(--danger);">Apagar</button>
-                </td>
+                <td class="col-actions"><div class="actions-group">
+                    <button class="btn btn-warning btn-sm" onclick="editFuncionario(${func.funcionario_id})">Editar</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteFuncionario(${func.funcionario_id})">Apagar</button>
+                </div></td>
             </tr>
         `;
     }).join('');

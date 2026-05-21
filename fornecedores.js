@@ -42,13 +42,11 @@ async function loadFornecedores() {
           escapeHtml(f.email || '—') +
           '</td><td>' +
           escapeHtml(f.telemovel || '—') +
-          '</td><td class="table-actions">' +
-          '<button type="button" class="btn btn-secondary btn-sm" data-edit-forn="' +
+          '</td><td class="col-actions"><div class="actions-group"><button type="button" class="btn btn-warning btn-sm" data-edit-forn="' +
           f.fornecedor_id +
-          '">Editar</button> ' +
-          '<button type="button" class="btn btn-danger btn-sm" data-del-forn="' +
+          '">Editar</button><button type="button" class="btn btn-danger btn-sm" data-del-forn="' +
           f.fornecedor_id +
-          '">Apagar</button></td></tr>'
+          '">Apagar</button></div></td></tr>'
         );
       })
       .join('');

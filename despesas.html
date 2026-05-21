@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="/favicon.ico" sizes="any">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
     <title>Despesas - Sweet Cakes</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -47,7 +46,7 @@
 
             <section class="admin-section">
                 <h3 class="section-title">Nova despesa</h3>
-                <div class="info-card info-card--narrow">
+                <div class="info-card panel-card--full">
                     <div class="form-row-2">
                         <div class="form-group">
                             <label for="despTipo">Tipo</label>
@@ -91,7 +90,9 @@
                         <label for="despNotas">Notas (opcional)</label>
                         <input type="text" id="despNotas" maxlength="500">
                     </div>
-                    <button type="button" id="despAddBtn" class="btn btn-primary">Adicionar despesa</button>
+                    <div class="panel-card__actions panel-card__actions--flush">
+                        <button type="button" id="despAddBtn" class="btn btn-success">Adicionar despesa</button>
+                    </div>
                 </div>
             </section>
 
@@ -112,7 +113,7 @@
                                 <th>Origem</th>
                                 <th>Descrição</th>
                                 <th>Valor</th>
-                                <th></th>
+                                <th class="col-actions">Ações</th>
                             </tr>
                         </thead>
                         <tbody></tbody>

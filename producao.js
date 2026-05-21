@@ -115,7 +115,7 @@ function renderProdutos(list) {
         base +
         '<td><input type="number" min="1" step="1" value="1" id="add-' +
         id +
-        '" class="qty-input"></td><td><button type="button" class="btn btn-primary btn-sm" data-prod="' +
+        '" class="qty-input"></td><td><button type="button" class="btn btn-success btn-sm" data-prod="' +
         id +
         '">Registar</button></td></tr>'
       );
@@ -172,7 +172,7 @@ function renderReceitas(list) {
         '<label>Vezes <input type="number" min="1" max="500" value="1" id="rx-' +
         r.receita_id +
         '" class="qty-input"></label> ' +
-        '<button type="button" class="btn btn-primary" data-rx="' +
+        '<button type="button" class="btn btn-success" data-rx="' +
         r.receita_id +
         '">Executar receita</button>' +
         '</div></div>'
