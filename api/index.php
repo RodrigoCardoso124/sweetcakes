@@ -376,7 +376,11 @@ if (!sc_is_public_api_route($resource, $httpMethod)) {
         exit();
     }
     $isElevatedAdmin = sc_is_elevated_admin($db);
-    if (sc_route_requires_admin($resource, $httpMethod) && !$isElevatedAdmin) {
+    $ownPessoaRead = $resource === 'pessoas'
+        && $httpMethod === 'GET'
+        && $id
+        && (int) $id === (int) Auth::pessoaId();
+    if (sc_route_requires_admin($resource, $httpMethod) && !$isElevatedAdmin && !$ownPessoaRead) {
         http_response_code(403);
         echo json_encode(['message' => 'Acesso reservado a administradores.']);
         exit();
