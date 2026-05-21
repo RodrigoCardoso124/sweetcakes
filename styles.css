@@ -656,33 +656,41 @@ body {
     color: #721c24;
 }
 
-/* Coluna de ações nas tabelas — sem flex no <td> (parte o alinhamento) */
+/* Coluna de ações — botões em fila (como antes), sem flex no <td> */
 .orders-table th.col-actions,
-.orders-table td.col-actions {
-    width: 10.5rem;
-    min-width: 10.5rem;
-    max-width: 12rem;
+.orders-table td.col-actions,
+td.actions-cell {
+    width: 1%;
+    white-space: nowrap;
     vertical-align: middle;
     text-align: left;
-    white-space: nowrap;
 }
 
-.actions-group,
-.actions-cell .actions-group {
-    display: inline-flex;
-    flex-wrap: wrap;
+.actions-group {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     gap: 6px;
     align-items: center;
-    justify-content: flex-start;
 }
 
-/* Legado: células que ainda usam só .actions-cell */
-td.actions-cell:not(.col-actions) {
+/* Sem wrapper: botões diretos na célula ficam em linha */
+.col-actions > .btn,
+.col-actions > .btn-sm,
+.col-actions > a.btn,
+.actions-cell > .btn,
+.actions-cell > .btn-sm {
+    display: inline-block;
     vertical-align: middle;
-    white-space: nowrap;
-    width: 10.5rem;
-    min-width: 10.5rem;
-    text-align: left;
+    margin-right: 6px;
+}
+
+.col-actions > .btn:last-child,
+.col-actions > .btn-sm:last-child,
+.col-actions > a.btn:last-child,
+.actions-cell > .btn:last-child,
+.actions-cell > .btn-sm:last-child {
+    margin-right: 0;
 }
 
 /* Modal */
@@ -2041,8 +2049,10 @@ textarea:focus {
 }
 
 .actions-cell .btn-sm,
-.actions-group .btn-sm {
+.actions-group .btn-sm,
+.col-actions .btn-sm {
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* —— Layout: usar bem a largura em todas as páginas —— */
