@@ -5,7 +5,7 @@
  */
 $appConfig = [
     'app_env' => 'local',
-    'app_debug' => true,
+    'app_debug' => false,
     /** Origens permitidas para CORS (vazio = só mesmo host, sem header Access-Control-Allow-Origin) */
     'cors_origins' => [],
     'session_name' => 'SWEETCAKESSESSID',

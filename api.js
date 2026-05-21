@@ -34,56 +34,31 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
     }
 
     try {
-        console.log(`🌐 [API] ${method} ${url}`, data ? { data } : '');
         const response = await fetch(url, options);
-        
-        // Get response text first to debug
         const responseText = await response.text();
-        console.log(`📥 [API] Status: ${response.status} ${response.statusText}`);
-        console.log(`📥 [API] Response body:`, responseText);
-        
-        // Try to parse JSON response
+
         let result;
         try {
-            result = JSON.parse(responseText);
+            result = responseText ? JSON.parse(responseText) : {};
         } catch (e) {
-            // If response is not JSON, log the actual response
-            console.error('❌ [API] Resposta não é JSON válido!');
-            console.error('❌ [API] Status:', response.status, response.statusText);
-            console.error('❌ [API] Response Text (primeiros 500 chars):', responseText.substring(0, 500));
-            console.error('❌ [API] Response Text (completo):', responseText);
-            console.error('❌ [API] Erro ao fazer parse:', e);
-            
-            // Create error with actual response text
-            const error = new Error(`Resposta do servidor não é JSON válido. Status: ${response.status}. Resposta: ${responseText.substring(0, 200)}`);
+            const error = new Error('Erro ao processar resposta do servidor.');
             error.status = response.status;
-            error.response = { 
-                message: 'Erro ao processar resposta do servidor',
-                raw: responseText,
-                status: response.status,
-                statusText: response.statusText
-            };
             throw error;
         }
-        
+
         if (!response.ok) {
-            // Create error with message from API
-            const error = new Error(result.message || `Erro ${response.status}: ${response.statusText}`);
+            const error = new Error(
+                (result && result.message) || 'Erro ao comunicar com o servidor.'
+            );
             error.status = response.status;
-            error.response = result;
-            console.error('❌ [API] Erro na resposta:', result);
             throw error;
         }
-        
-        console.log('✅ [API] Sucesso:', result);
+
         return result;
     } catch (error) {
-        // If it's already our custom error, re-throw it
-        if (error.message && error.status) {
+        if (error.status) {
             throw error;
         }
-        // Otherwise, wrap it
-        console.error('❌ [API] Erro na requisição:', error);
         throw new Error(error.message || 'Erro ao comunicar com o servidor');
     }
 }
@@ -138,43 +113,18 @@ const API = {
     // Encomenda Detalhes
     async getEncomendaDetalhes(encomendaId) {
         try {
-            const url = `${API_BASE_URL}/encomenda_detalhes?encomenda_id=${encomendaId}`;
-            const sessionId = localStorage.getItem('apiSessionId');
-            const token = localStorage.getItem('adminToken') || sessionId;
-            const headers = { 'Accept': 'application/json' };
-            if (sessionId) headers['X-Session-ID'] = sessionId;
-            if (token) headers['Authorization'] = 'Bearer ' + token;
-
-            const response = await fetch(url, {
-                method: 'GET',
-                headers
-            });
-            
-            console.log('📥 Resposta status:', response.status, response.statusText);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Erro na resposta:', errorText);
-                throw new Error(`Erro ao buscar detalhes: ${response.status} ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            console.log('✅ Detalhes recebidos:', data);
-            return data;
+            const data = await apiRequest(
+                'encomenda_detalhes?encomenda_id=' + encodeURIComponent(encomendaId)
+            );
+            if (Array.isArray(data)) return data;
+            return data ? [data] : [];
         } catch (error) {
-            console.error('❌ Error fetching detalhes:', error);
-            // Fallback: try to get all and filter
             try {
-                console.log('🔄 Tentando fallback: buscar todos os detalhes...');
                 const allDetalhes = await apiRequest('encomenda_detalhes');
                 if (Array.isArray(allDetalhes)) {
-                    const filtered = allDetalhes.filter(d => d.encomenda_id == encomendaId);
-                    console.log('✅ Fallback funcionou, detalhes filtrados:', filtered);
-                    return filtered;
+                    return allDetalhes.filter((d) => d.encomenda_id == encomendaId);
                 }
-            } catch (fallbackError) {
-                console.error('❌ Fallback also failed:', fallbackError);
-            }
+            } catch (e) { /* fallback silencioso */ }
             return [];
         }
     },

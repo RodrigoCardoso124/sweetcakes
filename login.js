@@ -50,11 +50,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorMsg = error.message;
             }
             
-            // Log error for debugging
-            console.error('Login error:', error);
-            console.error('Error status:', error.status);
-            console.error('Error response:', error.response);
-            
             errorMessage.textContent = errorMsg;
             errorMessage.style.display = 'block';
         } finally {

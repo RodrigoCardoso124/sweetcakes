@@ -29,6 +29,8 @@ Executa a seguir. Cria um admin temporário:
 | Email | `claudia31cardoso@gmail.com` |
 | Password | `Sweetcakes77.` |
 
-### Passo 3 — Dados reais
+### Passo 3 — Catálogo de bolos (preçário)
 
-Insere pelo painel ou envia-me SQL/listas e preparo os ficheiros contigo.
+Ficheiro: **`016_importar_catalogo_sweet_cakes.sql`**
+
+30 produtos (semifrios, bolos, tartes, tortas) com preços e alergénios. Executar **uma vez**. Imagens depois no painel Produtos.

@@ -316,7 +316,6 @@ async function loadEstatisticas() {
         }
 
     } catch (error) {
-        console.error('Error loading statistics:', error);
         if (typeof showToast === 'function') showToast('Erro ao carregar estatísticas: ' + error.message, 'error');
         else alert('Erro ao carregar estatísticas: ' + error.message);
     }

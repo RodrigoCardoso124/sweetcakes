@@ -38,7 +38,6 @@ async function loadProdutos() {
       produtosCache[produto.produto_id] = produto;
     });
   } catch (error) {
-    console.error('Error loading produtos:', error);
   }
 }
 
@@ -59,16 +58,13 @@ async function loadEncomendaDetails() {
     if (currentUserIsAdmin) {
       try {
         cliente = await API.getPessoa(encomenda.cliente_id);
-      } catch (err) {
-        console.error('Error loading cliente:', err);
-      }
+      } catch (err) { /* cliente opcional */ }
     }
 
     let detalhes = [];
     try {
       detalhes = await API.getEncomendaDetalhes(currentEncomendaId);
     } catch (err) {
-      console.error('Error loading detalhes:', err);
     }
 
     await displayEncomenda(encomenda, cliente, detalhes);

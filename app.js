@@ -195,9 +195,7 @@ async function loadClientes() {
     pessoas.forEach(function (pessoa) {
       clientesCache[pessoa.pessoa_id] = pessoa;
     });
-  } catch (error) {
-    console.error('Error loading clientes:', error);
-  }
+  } catch (error) { /* ignorar — lista de clientes opcional no cache */ }
 }
 
 function exportEncomendasCsv() {
@@ -454,7 +452,6 @@ async function updateOrderStatus() {
       );
     }
   } catch (error) {
-    console.error('Erro:', error);
     var msg = error.message || 'Erro ao atualizar';
     if (typeof showToast === 'function') showToast(msg, 'error');
     else alert(msg);
