@@ -3,10 +3,54 @@
 require_once __DIR__ . '/../models/Produto.php';
 
 /**
- * Liga stock de produtos às linhas de encomenda (desconto ao reservar linha; reposição ao apagar ou cancelar).
+ * Stock de produtos nas encomendas:
+ * - Pendente: linhas sem desconto (cliente ainda não confirmado pela loja).
+ * - Aceite / em preparação / pronta / entregue: stock descontado.
+ * - Cancelada ou volta a pendente: repõe o que tinha sido descontado.
  */
 class EncomendaStockHelper
 {
+    /** Estados em que o stock da encomenda já está comprometido. */
+    public static function estadoComprometeStock(string $estado): bool
+    {
+        $e = strtolower(trim($estado));
+
+        return in_array($e, ['aceite', 'em_preparacao', 'pronta', 'entregue'], true);
+    }
+
+    public static function fetchEstadoEncomenda(PDO $db, int $encomendaId): string
+    {
+        $stmt = $db->prepare('SELECT estado FROM encomendas WHERE encomenda_id = :id LIMIT 1');
+        $stmt->bindValue(':id', $encomendaId, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return strtolower(trim((string) ($row['estado'] ?? '')));
+    }
+
+    /**
+     * Ao mudar o estado da encomenda: desconta linhas ao aceitar; repõe ao cancelar ou reverter para pendente.
+     *
+     * @return string|null mensagem de erro (ex. stock insuficiente) ou null se OK
+     */
+    public static function aplicarTransicaoStockEstado(
+        PDO $db,
+        int $encomendaId,
+        string $estadoAntigo,
+        string $estadoNovo
+    ): ?string {
+        $tinha = self::estadoComprometeStock($estadoAntigo);
+        $passa = self::estadoComprometeStock($estadoNovo);
+        if (!$tinha && $passa) {
+            return self::descontarTodasLinhasEncomenda($db, $encomendaId);
+        }
+        if ($tinha && !$passa) {
+            self::reporTodasLinhasEncomenda($db, $encomendaId);
+        }
+
+        return null;
+    }
+
     public static function quantidadeParaInt($quantidade): int
     {
         $n = (float) $quantidade;

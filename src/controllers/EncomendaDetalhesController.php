@@ -83,11 +83,14 @@ class EncomendaDetalheController
 
     public function store($data)
     {
-        if (!isset($data['encomenda_id'], $data['produto_id'], $data['quantidade'], $data['especifico'])) {
+        if (!isset($data['encomenda_id'], $data['produto_id'], $data['quantidade'])) {
             http_response_code(400);
-            echo json_encode(['message' => 'Campos obrigatórios: encomenda_id, produto_id, quantidade, especifico']);
+            echo json_encode(['message' => 'Campos obrigatórios: encomenda_id, produto_id, quantidade']);
 
             return;
+        }
+        if (!isset($data['especifico'])) {
+            $data['especifico'] = '';
         }
 
         if (!$this->assertOwnsEncomenda((int) $data['encomenda_id'])) {
@@ -131,15 +134,20 @@ class EncomendaDetalheController
         $this->detalhe->preco_unitario = $snap['preco_unitario'];
         $this->detalhe->custo_unitario_estimado = $snap['custo_unitario_estimado'];
 
+        $estadoEnc = strtolower((string) ($encRow['estado'] ?? ''));
+        $descontarStock = EncomendaStockHelper::estadoComprometeStock($estadoEnc);
+
         try {
             $this->db->beginTransaction();
-            $chk = EncomendaStockHelper::tentarDescontarStock($this->db, (int) $data['produto_id'], $qtyInt);
-            if (!$chk['ok']) {
-                $this->db->rollBack();
-                http_response_code(409);
-                echo json_encode(['message' => $chk['message'] ?? 'Stock insuficiente']);
+            if ($descontarStock) {
+                $chk = EncomendaStockHelper::tentarDescontarStock($this->db, (int) $data['produto_id'], $qtyInt);
+                if (!$chk['ok']) {
+                    $this->db->rollBack();
+                    http_response_code(409);
+                    echo json_encode(['message' => $chk['message'] ?? 'Stock insuficiente']);
 
-                return;
+                    return;
+                }
             }
             if (!$this->detalhe->create()) {
                 $this->db->rollBack();
@@ -205,8 +213,9 @@ class EncomendaDetalheController
         $this->detalhe->especifico = $data['especifico'] ?? $existing['especifico'];
 
         $eid = (int) ($existing['encomenda_id'] ?? 0);
-        $jaCancelada = EncomendaStockHelper::encomendaEstaCancelada($this->db, $eid);
-        $stockMuda = !$jaCancelada && ($newPid !== $oldPid || $newQ !== $oldQ);
+        $estadoEnc = EncomendaStockHelper::fetchEstadoEncomenda($this->db, $eid);
+        $stockMuda = EncomendaStockHelper::estadoComprometeStock($estadoEnc)
+            && ($newPid !== $oldPid || $newQ !== $oldQ);
 
         try {
             if ($stockMuda) {
@@ -265,11 +274,11 @@ class EncomendaDetalheController
         $pid = (int) ($existing['produto_id'] ?? 0);
         $qty = EncomendaStockHelper::quantidadeParaInt($existing['quantidade'] ?? 0);
         $eid = (int) ($existing['encomenda_id'] ?? 0);
-        $jaCancelada = EncomendaStockHelper::encomendaEstaCancelada($this->db, $eid);
+        $estadoEnc = EncomendaStockHelper::fetchEstadoEncomenda($this->db, $eid);
 
         try {
             $this->db->beginTransaction();
-            if (!$jaCancelada) {
+            if (EncomendaStockHelper::estadoComprometeStock($estadoEnc)) {
                 EncomendaStockHelper::reporStock($this->db, $pid, $qty);
             }
             if (!$this->detalhe->delete()) {

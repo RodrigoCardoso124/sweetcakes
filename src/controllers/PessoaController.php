@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../models/Pessoa.php';
 require_once __DIR__ . '/../helpers/Auth.php';
+require_once __DIR__ . '/../helpers/NifHelper.php';
 
 class PessoaController
 {
@@ -55,7 +56,14 @@ class PessoaController
         $this->pessoa->email = $data['email'];
         $this->pessoa->telemovel = $data['telemovel'];
         $this->pessoa->morada = $data['morada'];
-        $this->pessoa->nif = isset($data['nif']) ? trim((string) $data['nif']) : null;
+        $nif = isset($data['nif']) ? trim((string) $data['nif']) : '';
+        if ($nif !== '' && !NifHelper::valido($nif)) {
+            http_response_code(400);
+            echo json_encode(['message' => 'NIF inválido']);
+
+            return;
+        }
+        $this->pessoa->nif = $nif !== '' ? $nif : null;
 
         if ($this->pessoa->create()) {
             $novoId = (int) $this->db->lastInsertId();
@@ -107,7 +115,14 @@ class PessoaController
         $this->pessoa->telemovel = $data['telemovel'] ?? null;
         $this->pessoa->morada = $data['morada'] ?? null;
         if (array_key_exists('nif', $data)) {
-            $this->pessoa->nif = trim((string) $data['nif']) ?: null;
+            $nif = trim((string) $data['nif']);
+            if ($nif !== '' && !NifHelper::valido($nif)) {
+                http_response_code(400);
+                echo json_encode(['message' => 'NIF inválido']);
+
+                return;
+            }
+            $this->pessoa->nif = $nif !== '' ? $nif : null;
         }
 
         if ($this->pessoa->update()) {

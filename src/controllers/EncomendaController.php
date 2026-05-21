@@ -1,6 +1,8 @@
 <?php
 include_once __DIR__ . '/../models/Encomenda.php';
 include_once __DIR__ . '/../models/Pessoa.php';
+include_once __DIR__ . '/../models/Produto.php';
+include_once __DIR__ . '/../models/EncomendaDetalhe.php';
 include_once __DIR__ . '/../models/Funcionario.php';
 include_once __DIR__ . '/../models/Promocao.php';
 include_once __DIR__ . '/../models/FidelidadePontos.php';
@@ -17,6 +19,7 @@ class EncomendaController
     private $encomenda;
     private $pessoa;
     private $funcionario;
+    private $produto;
 
     public function __construct($db)
     {
@@ -24,6 +27,7 @@ class EncomendaController
         $this->encomenda = new Encomenda($db);
         $this->pessoa = new Pessoa($db);
         $this->funcionario = new Funcionario($db);
+        $this->produto = new Produto($db);
     }
 
     public function index()
@@ -132,6 +136,75 @@ class EncomendaController
         $row = $stmt ? $stmt->fetch(PDO::FETCH_ASSOC) : false;
 
         return $row ? (int) $row['funcionario_id'] : null;
+    }
+
+    /**
+     * Cria linhas de encomenda a partir do array "itens" enviado pela app.
+     * Só desconta stock se a encomenda já estiver aceite (ou estados seguintes).
+     *
+     * @return array{criadas: int, erros: list<string>}
+     */
+    private function criarDetalhesFromItens(int $encomendaId, array $itens, string $estadoEnc): array
+    {
+        $criadas = 0;
+        $erros = [];
+        $descontarStock = EncomendaStockHelper::estadoComprometeStock($estadoEnc);
+
+        foreach ($itens as $raw) {
+            if (!is_array($raw)) {
+                continue;
+            }
+            $pid = (int) ($raw['produto_id'] ?? 0);
+            $q = (float) ($raw['quantidade'] ?? 0);
+            if ($pid <= 0 || $q <= 0) {
+                $erros[] = 'Linha inválida (produto ou quantidade)';
+                continue;
+            }
+            $esp = isset($raw['especifico']) ? (string) $raw['especifico'] : '';
+
+            $this->produto->produto_id = $pid;
+            if (!$this->produto->getById()->fetch(PDO::FETCH_ASSOC)) {
+                $erros[] = "Produto #$pid não existe";
+                continue;
+            }
+
+            $det = new EncomendaDetalhe($this->db);
+            $qtyInt = EncomendaStockHelper::quantidadeParaInt($q);
+            $snap = LucroCalculator::snapshotParaLinha($this->db, $pid);
+            $det->encomenda_id = $encomendaId;
+            $det->produto_id = $pid;
+            $det->quantidade = $q;
+            $det->especifico = $esp;
+            $det->preco_unitario = $snap['preco_unitario'];
+            $det->custo_unitario_estimado = $snap['custo_unitario_estimado'];
+
+            try {
+                $this->db->beginTransaction();
+                if ($descontarStock) {
+                    $chk = EncomendaStockHelper::tentarDescontarStock($this->db, $pid, $qtyInt);
+                    if (!$chk['ok']) {
+                        $this->db->rollBack();
+                        $erros[] = $chk['message'] ?? "Stock insuficiente (produto #$pid)";
+                        continue;
+                    }
+                }
+                if (!$det->create()) {
+                    $this->db->rollBack();
+                    $erros[] = "Erro ao gravar produto #$pid";
+                    continue;
+                }
+                $this->db->commit();
+                $criadas++;
+            } catch (Throwable $e) {
+                if ($this->db->inTransaction()) {
+                    $this->db->rollBack();
+                }
+                error_log('[criarDetalhesFromItens] ' . $e->getMessage());
+                $erros[] = "Erro ao gravar produto #$pid";
+            }
+        }
+
+        return ['criadas' => $criadas, 'erros' => $erros];
     }
 
     public function store($data)
@@ -251,6 +324,16 @@ class EncomendaController
                 error_log('Fidelidade após encomenda: ' . $e->getMessage());
             }
 
+            $itensEnc = is_array($data['itens'] ?? null) ? $data['itens'] : [];
+            $detResult = ['criadas' => 0, 'erros' => []];
+            if (!empty($itensEnc)) {
+                $detResult = $this->criarDetalhesFromItens(
+                    $encomendaId,
+                    $itensEnc,
+                    (string) ($data['estado'] ?? 'pendente')
+                );
+            }
+
             http_response_code(201);
             $resp = [
                 'message' => 'Encomenda criada com sucesso',
@@ -258,6 +341,8 @@ class EncomendaController
                 'total' => (float) $data['total'],
                 'desconto' => $desconto,
                 'promocao_id' => $promocaoId,
+                'detalhes_criados' => $detResult['criadas'],
+                'detalhes_erros' => $detResult['erros'],
             ];
             if (LucroCalculator::columnExists($this->db, 'encomendas', 'quer_fatura_contribuinte')) {
                 $resp['quer_fatura_contribuinte'] = !empty($data['quer_fatura_contribuinte'])
@@ -305,20 +390,21 @@ class EncomendaController
                     if ($result !== true) {
                         $this->db->rollBack();
                     } else {
-                        if ($newE === 'cancelada' && $oldE !== 'cancelada') {
-                            EncomendaStockHelper::reporTodasLinhasEncomenda($this->db, (int) $id);
-                        } elseif ($oldE === 'cancelada' && $newE !== 'cancelada') {
-                            $errStock = EncomendaStockHelper::descontarTodasLinhasEncomenda($this->db, (int) $id);
-                            if ($errStock !== null) {
-                                $this->db->rollBack();
-                                if (ob_get_level() > 0) {
-                                    ob_clean();
-                                }
-                                http_response_code(409);
-                                echo json_encode(['message' => $errStock]);
-
-                                return;
+                        $errStock = EncomendaStockHelper::aplicarTransicaoStockEstado(
+                            $this->db,
+                            (int) $id,
+                            $oldE,
+                            $newE
+                        );
+                        if ($errStock !== null) {
+                            $this->db->rollBack();
+                            if (ob_get_level() > 0) {
+                                ob_clean();
                             }
+                            http_response_code(409);
+                            echo json_encode(['message' => $errStock]);
+
+                            return;
                         }
                         $this->db->commit();
                     }
@@ -458,11 +544,9 @@ class EncomendaController
             return;
         }
 
-        $jaCancelada = strtolower(trim((string) ($rowEnc['estado'] ?? ''))) === 'cancelada';
-
         try {
             $this->db->beginTransaction();
-            if (!$jaCancelada) {
+            if (EncomendaStockHelper::estadoComprometeStock((string) ($rowEnc['estado'] ?? ''))) {
                 EncomendaStockHelper::reporTodasLinhasEncomenda($this->db, (int) $id);
             }
             if (!$this->encomenda->delete()) {
