@@ -74,8 +74,7 @@
                                 <th>Stock</th>
                                 <th>Mín.</th>
                                 <th>Unid.</th>
-                                <th>Actualizar</th>
-                                <th>Pedido</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -98,7 +97,7 @@
                                 <th>Total €</th>
                                 <th>Fatura</th>
                                 <th>Data</th>
-                                <th class="col-actions">Ações</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -153,10 +152,25 @@
                 <input type="text" id="pedNotas" maxlength="500">
             </div>
             <div class="form-group">
-                <label for="pedEmailFornecedor">Email do fornecedor (opcional)</label>
-                <input type="email" id="pedEmailFornecedor" maxlength="255" placeholder="fornecedor@exemplo.com" autocomplete="off">
-                <small class="muted">Se preencheres, enviamos o pedido por email (SMTP configurado no servidor).</small>
+                <label for="pedFornModo">Fornecedor</label>
+                <select id="pedFornModo">
+                    <option value="registado">Fornecedor registado</option>
+                    <option value="outro">Outro fornecedor (não está na lista)</option>
+                </select>
             </div>
+            <div class="form-group" id="pedFornRegistadoWrap">
+                <label for="pedFornecedorId">Escolher fornecedor</label>
+                <select id="pedFornecedorId">
+                    <option value="">— Seleccionar —</option>
+                </select>
+                <small class="muted" id="pedFornEmailHint"></small>
+            </div>
+            <div class="form-group" id="pedFornOutroWrap" style="display:none;">
+                <label for="pedEmailFornecedor">Email do fornecedor</label>
+                <input type="email" id="pedEmailFornecedor" maxlength="255" placeholder="fornecedor@exemplo.com" autocomplete="off">
+                <small class="muted">Só para fornecedores que ainda não estão em <a href="fornecedores.html">Fornecedores</a>.</small>
+            </div>
+            <p class="muted" style="margin:0 0 12px;font-size:0.9rem;">Com fornecedor registado, o pedido é enviado automaticamente para o email da ficha.</p>
             <div class="modal-actions">
                 <button type="button" class="btn btn-info" id="pedSave">Registar pedido</button>
                 <button type="button" class="btn btn-secondary" id="pedCancel">Cancelar</button>

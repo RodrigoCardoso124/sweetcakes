@@ -106,13 +106,44 @@ class IgredienteController {
     // ----------------------------------------------------------------
 
     public function destroy($id) {
+        $id = (int) $id;
         $this->ingrediente->ingrediente_id = $id;
+        $stmt = $this->ingrediente->getById();
+        if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
+            http_response_code(404);
+            echo json_encode(['message' => 'Ingrediente não encontrado']);
+            return;
+        }
 
+        try {
+            $chk = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t'
+            );
+            $chk->execute([':t' => 'produto_ingrediente']);
+            if ((int) $chk->fetchColumn() > 0) {
+                $n = $this->db->prepare(
+                    'SELECT COUNT(*) FROM produto_ingrediente WHERE ingrediente_id = :id'
+                );
+                $n->execute([':id' => $id]);
+                if ((int) $n->fetchColumn() > 0) {
+                    http_response_code(400);
+                    echo json_encode([
+                        'message' => 'Não é possível apagar: o material está ligado a produtos. Remova-o primeiro nas fichas de produto.',
+                    ]);
+                    return;
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('destroy ingrediente check: ' . $e->getMessage());
+        }
+
+        $this->ingrediente->ingrediente_id = $id;
         if ($this->ingrediente->delete()) {
-            echo json_encode(["message" => "Ingrediente removido com sucesso"]);
+            echo json_encode(['message' => 'Material removido com sucesso']);
         } else {
             http_response_code(500);
-            echo json_encode(["message" => "Erro ao remover ingrediente"]);
+            echo json_encode(['message' => 'Erro ao remover material']);
         }
     }
 }

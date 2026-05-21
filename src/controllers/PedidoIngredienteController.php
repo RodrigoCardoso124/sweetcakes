@@ -8,6 +8,32 @@ require_once __DIR__ . '/../helpers/LucroCalculator.php';
 
 class PedidoIngredienteController
 {
+    /** Email de contacto do fornecedor (pessoas.email). */
+    private static function emailFromFornecedorId(PDO $db, int $fornecedorId): ?string
+    {
+        if ($fornecedorId <= 0) {
+            return null;
+        }
+        $stmt = $db->prepare(
+            'SELECT p.email
+             FROM fornecedores f
+             LEFT JOIN pessoas p ON p.pessoa_id = f.pessoas_pessoa_id
+             WHERE f.fornecedor_id = :id
+             LIMIT 1'
+        );
+        $stmt->execute([':id' => $fornecedorId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        $email = trim((string) ($row['email'] ?? ''));
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        return $email;
+    }
+
     private static function anexarFiscalAosPedidos(PDO $db, array $list): array
     {
         try {
@@ -136,9 +162,22 @@ class PedidoIngredienteController
             return;
         }
         $notas = isset($data['notas']) ? trim((string) $data['notas']) : null;
+        $fornecedorId = isset($data['fornecedor_id']) ? (int) $data['fornecedor_id'] : 0;
         $emailFornecedor = isset($data['email_fornecedor']) ? trim((string) $data['email_fornecedor']) : null;
         if ($emailFornecedor === '') {
             $emailFornecedor = null;
+        }
+
+        if ($fornecedorId > 0) {
+            $emailResolvido = self::emailFromFornecedorId($this->db, $fornecedorId);
+            if ($emailResolvido === null) {
+                http_response_code(400);
+                echo json_encode([
+                    'message' => 'Este fornecedor não tem email na ficha. Edite-o em Fornecedores ou escolha «Outro fornecedor» e indique o email.',
+                ]);
+                return;
+            }
+            $emailFornecedor = $emailResolvido;
         }
 
         $nomeMat = (string) ($ingRow['nome'] ?? 'Material');
@@ -268,7 +307,7 @@ class PedidoIngredienteController
                         http_response_code($arquivo['code'] ?? 500);
                         echo json_encode([
                             'message' => $arquivo['error'],
-                            'hint' => 'Não foi possível guardar o PDF. Tente outra vez.',
+                            'hint' => 'Execute /api/migrate_013_documento_conteudo.php — PDFs guardam-se na base de dados.',
                             'fiscal' => $fiscal,
                         ], JSON_UNESCAPED_UNICODE);
 

@@ -2,6 +2,7 @@
 
 let ingredientes = [];
 let pedidos = [];
+let fornecedores = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   if (typeof initAdminShell === 'function') {
@@ -12,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pedClose').addEventListener('click', closePed);
   document.getElementById('pedCancel').addEventListener('click', closePed);
   document.getElementById('pedSave').addEventListener('click', savePed);
+  document.getElementById('pedFornModo').addEventListener('change', syncPedFornModo);
+  document.getElementById('pedFornecedorId').addEventListener('change', updatePedFornEmailHint);
   document.getElementById('recClose').addEventListener('click', closeRec);
   document.getElementById('recCancel').addEventListener('click', closeRec);
   document.getElementById('recSave').addEventListener('click', saveRec);
@@ -97,12 +100,83 @@ async function criarIngrediente() {
   }
 }
 
+function syncPedFornModo() {
+  const modo = document.getElementById('pedFornModo').value;
+  const reg = document.getElementById('pedFornRegistadoWrap');
+  const outro = document.getElementById('pedFornOutroWrap');
+  if (modo === 'outro') {
+    reg.style.display = 'none';
+    outro.style.display = '';
+    document.getElementById('pedEmailFornecedor').value = '';
+  } else {
+    reg.style.display = '';
+    outro.style.display = 'none';
+    document.getElementById('pedEmailFornecedor').value = '';
+    updatePedFornEmailHint();
+  }
+}
+
+function updatePedFornEmailHint() {
+  const hint = document.getElementById('pedFornEmailHint');
+  if (!hint) return;
+  const fid = document.getElementById('pedFornecedorId').value;
+  const f = fornecedores.find((x) => String(x.fornecedor_id) === String(fid));
+  if (!f) {
+    hint.textContent = '';
+    return;
+  }
+  if (f.email) {
+    hint.textContent = 'Será enviado para: ' + f.email;
+  } else {
+    hint.textContent = 'Este fornecedor não tem email — edite em Fornecedores ou use «Outro fornecedor».';
+    hint.style.color = 'var(--warn, #b45309)';
+  }
+}
+
+function fillPedFornecedorSelect() {
+  const sel = document.getElementById('pedFornecedorId');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML =
+    '<option value="">— Seleccionar —</option>' +
+    fornecedores
+      .map((f) => {
+        const label = (f.empresa || 'Fornecedor') + (f.email ? ' (' + f.email + ')' : ' — sem email');
+        return (
+          '<option value="' +
+          f.fornecedor_id +
+          '"' +
+          (f.email ? '' : ' data-sem-email="1"') +
+          '>' +
+          escapeHtml(label) +
+          '</option>'
+        );
+      })
+      .join('');
+  if (cur) sel.value = cur;
+}
+
+function openPedModal(ing) {
+  document.getElementById('pedIngId').value = ing.ingrediente_id;
+  document.getElementById('pedIngNome').textContent = ing ? ing.nome : '';
+  document.getElementById('pedQ').value = '';
+  document.getElementById('pedNotas').value = '';
+  document.getElementById('pedFornModo').value = 'registado';
+  document.getElementById('pedFornecedorId').value = '';
+  document.getElementById('pedEmailFornecedor').value = '';
+  fillPedFornecedorSelect();
+  syncPedFornModo();
+  document.getElementById('pedModal').classList.add('active');
+}
+
 async function load() {
   try {
-    const [ing, ped] = await Promise.all([
+    const [ing, ped, forn] = await Promise.all([
       API.getIngredientes(),
-      API.getPedidosIngrediente()
+      API.getPedidosIngrediente(),
+      API.getFornecedores().catch(() => [])
     ]);
+    fornecedores = Array.isArray(forn) ? forn : [];
     ingredientes = Array.isArray(ing) ? ing : [];
     pedidos = Array.isArray(ped) ? ped : [];
     renderIng(ingredientes);
@@ -150,11 +224,16 @@ function renderIng(list) {
         i.quantidade_minima +
         '"></td><td>' +
         escapeHtml(i.unidade || '') +
-        '</td><td><button type="button" class="btn btn-success btn-sm" data-save="' +
+        '</td><td class="col-actions"><div class="actions-group">' +
+        '<button type="button" class="btn btn-success btn-sm" data-save="' +
         i.ingrediente_id +
-        '">Guardar</button></td><td><button type="button" class="btn btn-info btn-sm" data-ped="' +
+        '">Guardar</button>' +
+        '<button type="button" class="btn btn-info btn-sm" data-ped="' +
         i.ingrediente_id +
-        '">Pedir</button></td></tr>'
+        '">Pedir</button>' +
+        '<button type="button" class="btn btn-danger btn-sm" data-del="' +
+        i.ingrediente_id +
+        '">Apagar</button></div></td></tr>'
       );
     })
     .join('');
@@ -185,12 +264,23 @@ function renderIng(list) {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-ped');
       const ing = ingredientes.find((x) => String(x.ingrediente_id) === String(id));
-      document.getElementById('pedIngId').value = id;
-      document.getElementById('pedIngNome').textContent = ing ? ing.nome : '';
-      document.getElementById('pedQ').value = '';
-      document.getElementById('pedNotas').value = '';
-      document.getElementById('pedEmailFornecedor').value = '';
-      document.getElementById('pedModal').classList.add('active');
+      openPedModal(ing || { ingrediente_id: id, nome: '' });
+    });
+  });
+
+  tb.querySelectorAll('[data-del]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-del');
+      const ing = ingredientes.find((x) => String(x.ingrediente_id) === String(id));
+      const nome = ing ? ing.nome : 'este material';
+      if (!confirm('Apagar «' + nome + '»? Os pedidos deste material também serão removidos.')) return;
+      try {
+        await API.deleteIngrediente(id);
+        showToast('Material apagado', 'success');
+        load();
+      } catch (e) {
+        showToast(e.message || 'Erro', 'warning');
+      }
     });
   });
 }
@@ -199,14 +289,33 @@ async function savePed() {
   const id = parseInt(document.getElementById('pedIngId').value, 10);
   const q = parseFloat(document.getElementById('pedQ').value);
   const notas = document.getElementById('pedNotas').value.trim();
-  const emailFornecedor = document.getElementById('pedEmailFornecedor').value.trim();
+  const modo = document.getElementById('pedFornModo').value;
   if (!id || !(q > 0)) {
     showToast('Quantidade inválida', 'warning');
     return;
   }
+  const payload = { ingrediente_id: id, quantidade: q, notas: notas || null };
+  if (modo === 'registado') {
+    const fid = parseInt(document.getElementById('pedFornecedorId').value, 10);
+    if (!fid) {
+      showToast('Seleccione um fornecedor', 'warning');
+      return;
+    }
+    const f = fornecedores.find((x) => x.fornecedor_id === fid);
+    if (!f || !f.email) {
+      showToast('Este fornecedor não tem email — use «Outro fornecedor» ou edite a ficha em Fornecedores', 'warning');
+      return;
+    }
+    payload.fornecedor_id = fid;
+  } else {
+    const emailFornecedor = document.getElementById('pedEmailFornecedor').value.trim();
+    if (!emailFornecedor) {
+      showToast('Indique o email do fornecedor', 'warning');
+      return;
+    }
+    payload.email_fornecedor = emailFornecedor;
+  }
   try {
-    const payload = { ingrediente_id: id, quantidade: q, notas: notas || null };
-    if (emailFornecedor) payload.email_fornecedor = emailFornecedor;
     const res = await API.createPedidoIngrediente(payload);
     showToast('Pedido registado', 'success');
     if (res && res.email_pedido && typeof showToast === 'function') {

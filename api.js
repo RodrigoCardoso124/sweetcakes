@@ -357,6 +357,10 @@ const API = {
         return apiRequest(`ingredientes/${id}`, 'PUT', data);
     },
 
+    async deleteIngrediente(id) {
+        return apiRequest(`ingredientes/${id}`, 'DELETE');
+    },
+
     async getProducaoResumo() {
         return apiRequest('producao');
     },
