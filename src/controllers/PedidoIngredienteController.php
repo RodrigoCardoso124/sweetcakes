@@ -250,12 +250,11 @@ class PedidoIngredienteController
                             'pedido_id' => (int) $id,
                             'estado' => $estado,
                             'fiscal' => $fiscal,
-                            'hint' => 'Abra no browser: /api/migrate_009_faturacao.php e /api/migrate_012_documentos.php',
+                            'hint' => 'Abra no browser: /api/migrate_012_documentos.php e /api/migrate_013_documento_conteudo.php',
                         ], JSON_UNESCAPED_UNICODE);
 
                         return;
                     }
-                    require_once __DIR__ . '/../helpers/CloudinaryUploadHelper.php';
                     require_once __DIR__ . '/../helpers/DocumentStorageService.php';
                     $arquivo = DocumentStorageService::guardarUpload(
                         $this->db,
@@ -269,7 +268,7 @@ class PedidoIngredienteController
                         http_response_code($arquivo['code'] ?? 500);
                         echo json_encode([
                             'message' => $arquivo['error'],
-                            'hint' => CloudinaryUploadHelper::configErrorMessage(),
+                            'hint' => 'Execute /api/migrate_013_documento_conteudo.php — PDFs guardam-se na base de dados.',
                             'fiscal' => $fiscal,
                         ], JSON_UNESCAPED_UNICODE);
 
