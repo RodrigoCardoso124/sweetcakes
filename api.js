@@ -149,16 +149,22 @@ const API = {
         return apiRequest(`produtos/${id}`);
     },
 
-    async getProdutos() {
-        return apiRequest('produtos');
+    async getProdutos(categoriaId = null) {
+        const q = categoriaId ? `?categoria_id=${encodeURIComponent(categoriaId)}` : '';
+        return apiRequest('produtos' + q);
+    },
+
+    async getCategoriasProduto() {
+        return apiRequest('categorias_produto');
     },
 
     async createProduto(data, imageFile = null) {
         if (imageFile) {
             const formData = new FormData();
             formData.append('nome', data.nome);
-            formData.append('descricao', data.descricao);
+            formData.append('descricao', data.descricao || '');
             formData.append('preco', data.preco);
+            if (data.categoria_id) formData.append('categoria_id', String(data.categoria_id));
             formData.append('disponivel', data.disponivel || 1);
             formData.append('stock_atual', data.stock_atual != null ? String(data.stock_atual) : '0');
             formData.append('stock_minimo', data.stock_minimo != null ? String(data.stock_minimo) : '0');
@@ -193,6 +199,9 @@ const API = {
             if (data.nome) formData.append('nome', data.nome);
             if (data.descricao !== undefined && data.descricao !== null) {
                 formData.append('descricao', data.descricao);
+            }
+            if (data.categoria_id !== undefined && data.categoria_id !== null && data.categoria_id !== '') {
+                formData.append('categoria_id', String(data.categoria_id));
             }
             if (data.preco !== undefined && data.preco !== null && data.preco !== '') {
                 formData.append('preco', String(data.preco));

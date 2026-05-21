@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . "/../models/Produto.php";
+include_once __DIR__ . '/../models/CategoriaProduto.php';
 include_once __DIR__ . "/../models/ProdutoIngrediente.php";
 include_once __DIR__ . "/../models/Ingredientes.php";
 require_once __DIR__ . '/../helpers/stock_alert_mail.php';
@@ -18,6 +19,7 @@ class ProdutoController {
         $this->ingrediente = new Ingredientes($db);
         $this->ensureAlergeniosColumn();
         $this->ensureStockColumns();
+        CategoriaProduto::ensureSchema($db);
         $this->cloudinaryConfig = $this->loadCloudinaryConfig();
     }
 
@@ -275,7 +277,11 @@ class ProdutoController {
     // LISTAR TODOS
     // ------------------------------------------------------------
     public function index() {
-        $stmt = $this->produto->getAll();
+        $categoriaId = null;
+        if (isset($_GET['categoria_id']) && $_GET['categoria_id'] !== '') {
+            $categoriaId = (int) $_GET['categoria_id'];
+        }
+        $stmt = $this->produto->getAll($categoriaId > 0 ? $categoriaId : null);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach ($rows as &$row) {
             if (isset($row['imagem'])) {
@@ -314,9 +320,9 @@ class ProdutoController {
     // O index() devolve depois uploads/produtos/nome para o frontend ir buscar.
     // ------------------------------------------------------------
     public function store($data, $files = null) {
-        if (!isset($data['nome'], $data['descricao'], $data['preco'])) {
+        if (!isset($data['nome'], $data['preco'])) {
             http_response_code(400);
-            echo json_encode(["message" => "Campos obrigatórios: nome, descricao, preco"]);
+            echo json_encode(['message' => 'Campos obrigatórios: nome, preco']);
             return;
         }
 
@@ -332,8 +338,11 @@ class ProdutoController {
         }
 
         $this->produto->nome       = $data['nome'];
-        $this->produto->descricao  = $data['descricao'];
+        $this->produto->descricao  = $data['descricao'] ?? '';
         $this->produto->preco      = $data['preco'];
+        $this->produto->categoria_id = isset($data['categoria_id']) && (int) $data['categoria_id'] > 0
+            ? (int) $data['categoria_id']
+            : null;
         $this->produto->disponivel = isset($data['disponivel']) ? (int) $data['disponivel'] : 1;
         $this->produto->stock_atual = isset($data['stock_atual']) ? (int) $data['stock_atual'] : 0;
         $this->produto->stock_minimo = isset($data['stock_minimo']) ? (int) $data['stock_minimo'] : 0;
@@ -387,6 +396,15 @@ class ProdutoController {
         $this->produto->nome       = $data['nome']       ?? $produtoAtual['nome'];
         $this->produto->descricao  = $data['descricao']  ?? $produtoAtual['descricao'];
         $this->produto->preco      = $data['preco']      ?? $produtoAtual['preco'];
+        if (array_key_exists('categoria_id', $data)) {
+            $this->produto->categoria_id = (int) $data['categoria_id'] > 0
+                ? (int) $data['categoria_id']
+                : null;
+        } else {
+            $this->produto->categoria_id = isset($produtoAtual['categoria_id'])
+                ? (int) $produtoAtual['categoria_id']
+                : null;
+        }
         $this->produto->disponivel = array_key_exists('disponivel', $data)
             ? (int) $data['disponivel']
             : (int) ($produtoAtual['disponivel'] ?? 1);

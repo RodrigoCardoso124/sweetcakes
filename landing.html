@@ -79,6 +79,13 @@
         .product .price { color: var(--c1); font-weight: 700; font-size: 1.1rem; }
         .muted { color: #666; font-size: 14px; }
         footer { text-align: center; padding: 24px; color: #888; font-size: 13px; }
+        .category-explorer { margin: 20px 0 8px; }
+        .category-explorer__title { font-size: 15px; font-weight: 700; color: var(--c1); margin: 0 0 12px; }
+        .category-chips { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 16px; background: #fff; border-radius: 14px; border: 1px solid #eee; box-shadow: 0 4px 16px rgba(91,37,240,0.06); }
+        .category-chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; border: 2px solid rgba(91,37,240,0.12); background: #fff; font-size: 14px; font-weight: 600; color: #444; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+        .category-chip:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(91,37,240,0.12); }
+        .category-chip.is-active { background: linear-gradient(135deg, var(--c1), #7c3aed); color: #fff; border-color: transparent; box-shadow: 0 6px 18px rgba(91,37,240,0.3); }
+        .product-category-badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; background: linear-gradient(135deg, rgba(91,37,240,0.1), rgba(252,118,161,0.12)); color: var(--c1); margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -94,6 +101,10 @@
         <section class="card" id="catalogo">
             <h2>Catálogo (amostra)</h2>
             <p class="muted">Produtos disponíveis via API pública. Preços e stock podem variar.</p>
+            <div class="category-explorer">
+                <p class="category-explorer__title">Explorar por categoria</p>
+                <div id="categoriaChips" class="category-chips" role="tablist"></div>
+            </div>
             <div id="produtosGrid" class="grid" style="margin-top:20px;">
                 <p class="muted">A carregar…</p>
             </div>
@@ -105,25 +116,62 @@
         var path = window.location.pathname || '';
         var base = path.replace(/\/[^/]*$/, '');
         if (!base || base === path) base = '';
-        var api = window.location.origin + base + '/index.php/produtos';
+        var apiBase = window.location.origin + base + '/index.php/';
         var grid = document.getElementById('produtosGrid');
-        fetch(api, { credentials: 'omit' })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                if (!Array.isArray(data) || !data.length) {
-                    grid.innerHTML = '<p class="muted">Sem produtos para mostrar.</p>';
-                    return;
-                }
-                var imgBase = window.location.origin + base + '/image.php?path=';
-                grid.innerHTML = data.slice(0, 12).map(function (p) {
-                    var img = p.imagem ? '<img src="' + imgBase + encodeURIComponent(p.imagem) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;">' : '';
-                    var disp = p.disponivel == 1 ? '' : '<span class="muted"> (indisponível)</span>';
-                    return '<div class="product">' + img + '<h3>' + (p.nome || 'Produto') + disp + '</h3><p class="muted" style="margin:0 0 8px;font-size:13px;">' + (p.descricao || '').substring(0, 80) + '</p><div class="price">€' + parseFloat(p.preco || 0).toFixed(2) + '</div></div>';
+        var chips = document.getElementById('categoriaChips');
+        var allProdutos = [];
+        var filtroCat = '';
+
+        function renderProdutos(list) {
+            if (!list.length) {
+                grid.innerHTML = '<p class="muted">Sem produtos nesta categoria.</p>';
+                return;
+            }
+            var imgBase = window.location.origin + base + '/image.php?path=';
+            grid.innerHTML = list.slice(0, 24).map(function (p) {
+                var img = p.imagem ? '<img src="' + imgBase + encodeURIComponent(p.imagem) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;">' : '';
+                var disp = p.disponivel == 1 ? '' : '<span class="muted"> (indisponível)</span>';
+                var cat = p.categoria_nome ? '<span class="product-category-badge">' + p.categoria_nome + '</span>' : '';
+                return '<div class="product">' + img + '<h3>' + (p.nome || 'Produto') + disp + '</h3>' + cat + '<div class="price">€' + parseFloat(p.preco || 0).toFixed(2) + '</div></div>';
+            }).join('');
+        }
+
+        function aplicarFiltro() {
+            var list = allProdutos;
+            if (filtroCat) list = list.filter(function (p) { return String(p.categoria_id) === filtroCat; });
+            renderProdutos(list);
+        }
+
+        Promise.all([
+            fetch(apiBase + 'categorias_produto', { credentials: 'omit' }).then(function (r) { return r.json(); }),
+            fetch(apiBase + 'produtos', { credentials: 'omit' }).then(function (r) { return r.json(); })
+        ]).then(function (res) {
+            var cats = Array.isArray(res[0]) ? res[0] : [];
+            allProdutos = Array.isArray(res[1]) ? res[1] : [];
+            if (!allProdutos.length) {
+                grid.innerHTML = '<p class="muted">Sem produtos para mostrar.</p>';
+                return;
+            }
+            var icons = { semifrios: '❄️', bolos: '🎂', tartes: '🥧', tortas: '🍰' };
+            chips.innerHTML = '<button type="button" class="category-chip is-active" data-cat="" role="tab"><span>📋</span> Todos</button>' +
+                cats.map(function (c) {
+                    var slug = (c.slug || '').toLowerCase();
+                    var ic = icons[slug] || '✨';
+                    return '<button type="button" class="category-chip category-chip--' + slug + '" data-cat="' + c.categoria_id + '" role="tab"><span>' + ic + '</span> ' + (c.nome || '') + '</button>';
                 }).join('');
-            })
-            .catch(function () {
-                grid.innerHTML = '<p class="muted">Não foi possível carregar o catálogo. Confirma que a API está acessível.</p>';
+            chips.querySelectorAll('.category-chip').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    filtroCat = btn.getAttribute('data-cat') || '';
+                    chips.querySelectorAll('.category-chip').forEach(function (b) {
+                        b.classList.toggle('is-active', b === btn);
+                    });
+                    aplicarFiltro();
+                });
             });
+            aplicarFiltro();
+        }).catch(function () {
+            grid.innerHTML = '<p class="muted">Não foi possível carregar o catálogo. Confirma que a API está acessível.</p>';
+        });
     })();
     </script>
 </body>

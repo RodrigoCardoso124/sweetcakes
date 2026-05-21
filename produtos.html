@@ -39,7 +39,15 @@
             <div id="produtosReadOnlyBanner" class="alert-banner" style="display:none;"></div>
 
             <!-- Filters -->
+            <div class="category-explorer">
+                <p class="category-explorer__title">Filtrar por categoria</p>
+                <div id="categoriaChipsBar" class="category-chips" role="tablist" aria-label="Categorias de produtos"></div>
+            </div>
+
             <div class="filters">
+                <select id="categoriaFilter" class="filter-select" hidden aria-hidden="true" tabindex="-1">
+                    <option value="">Todas as categorias</option>
+                </select>
                 <select id="disponibilidadeFilter" class="filter-select">
                     <option value="">Todos</option>
                     <option value="1">Disponíveis</option>
@@ -85,8 +93,15 @@
                     <input type="text" id="produtoNome" name="nome" required>
                 </div>
                 <div class="form-group">
-                    <label for="produtoDescricao">Descrição *</label>
-                    <textarea id="produtoDescricao" name="descricao" rows="4" required></textarea>
+                    <label for="produtoCategoria">Categoria *</label>
+                    <select id="produtoCategoria" name="categoria_id" class="filter-select" style="width:100%;max-width:none;" required>
+                        <option value="">— Selecionar categoria —</option>
+                    </select>
+                    <small style="color:#666;font-size:12px;">Semifrios, bolos, tartes, tortas — facilita a navegação na app e no site.</small>
+                </div>
+                <div class="form-group">
+                    <label for="produtoDescricao">Descrição</label>
+                    <textarea id="produtoDescricao" name="descricao" rows="3" placeholder="Texto opcional sobre o produto"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="produtoPreco">Preço (€) *</label>

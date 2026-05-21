@@ -144,6 +144,7 @@ $routes = [
     'funcionarios' => 'FuncionarioController',
     'ingredientes' => 'IgredienteController',
     'produtos' => 'ProdutoController',
+    'categorias_produto' => 'CategoriaProdutoController',
     'produto_ingredientes' => 'ProdutoIngredienteController',
     'vendas' => 'VendaController',
     'produtos_vendidos' => 'ProdutosVendidosController',
@@ -167,6 +168,9 @@ $routes = [
 function sc_is_public_api_route(?string $resource, string $method): bool
 {
     if ($resource === 'produtos' && $method === 'GET') {
+        return true;
+    }
+    if ($resource === 'categorias_produto' && $method === 'GET') {
         return true;
     }
     if ($resource === 'check_email' && $method === 'POST') {
@@ -215,6 +219,9 @@ function sc_route_requires_admin(?string $resource, string $method): bool
         return true;
     }
     if ($resource === 'produtos' && $method !== 'GET') {
+        return true;
+    }
+    if ($resource === 'categorias_produto' && $method !== 'GET') {
         return true;
     }
     if ($resource === 'promocoes' && $method !== 'GET') {

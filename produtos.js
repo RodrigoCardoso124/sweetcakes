@@ -2,6 +2,7 @@
 
 // Produtos management
 let allProdutos = [];
+let allCategorias = [];
 
 function isElevatedPainel() {
     return localStorage.getItem('adminIsAdmin') === 'true';
@@ -57,7 +58,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await refreshRoleFromServer();
     applyProdutosRoleUi();
-    loadProdutos();
+    loadCategorias().then(loadProdutos);
     setupEventListeners();
 });
 
@@ -70,6 +71,7 @@ function setupEventListeners() {
 
     document.getElementById('searchInput').addEventListener('input', filterProdutos);
     document.getElementById('disponibilidadeFilter').addEventListener('change', filterProdutos);
+    document.getElementById('categoriaFilter').addEventListener('change', filterProdutos);
 
     const modal = document.getElementById('produtoModal');
     const closeBtn = modal.querySelector('.close');
@@ -108,6 +110,63 @@ function setAlergeniosSelecionados(values = []) {
 function getAlergeniosSelecionados() {
     return Array.from(document.querySelectorAll('#produtoAlergeniosOptions input[type="checkbox"]:checked'))
         .map(el => el.value);
+}
+
+const CATEGORIA_ICONS = {
+    semifrios: '❄️',
+    bolos: '🎂',
+    tartes: '🥧',
+    tortas: '🍰',
+};
+
+function categoriaIcon(slug) {
+    return CATEGORIA_ICONS[String(slug || '').toLowerCase()] || '✨';
+}
+
+function renderCategoriaChipsBar(activeId) {
+    const bar = document.getElementById('categoriaChipsBar');
+    if (!bar) return;
+    const active = activeId === undefined || activeId === null ? '' : String(activeId);
+    const chips = [
+        `<button type="button" class="category-chip${active === '' ? ' is-active' : ''}" data-cat="" role="tab" aria-selected="${active === ''}"><span class="category-chip__icon">📋</span> Todos</button>`,
+        ...allCategorias.map(c => {
+            const id = String(c.categoria_id);
+            const slug = (c.slug || '').toLowerCase();
+            const cls = `category-chip category-chip--${slug}${active === id ? ' is-active' : ''}`;
+            return `<button type="button" class="${cls}" data-cat="${id}" role="tab" aria-selected="${active === id}"><span class="category-chip__icon">${categoriaIcon(slug)}</span> ${escapeHtml(c.nome)}</button>`;
+        }),
+    ].join('');
+    bar.innerHTML = chips;
+    bar.querySelectorAll('.category-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cat = btn.getAttribute('data-cat') || '';
+            const filter = document.getElementById('categoriaFilter');
+            if (filter) filter.value = cat;
+            renderCategoriaChipsBar(cat);
+            filterProdutos();
+        });
+    });
+}
+
+async function loadCategorias() {
+    try {
+        allCategorias = await API.getCategoriasProduto();
+        if (!Array.isArray(allCategorias)) allCategorias = [];
+        const opts = allCategorias
+            .map(c => `<option value="${c.categoria_id}">${escapeHtml(c.nome)}</option>`)
+            .join('');
+        const filter = document.getElementById('categoriaFilter');
+        const formSel = document.getElementById('produtoCategoria');
+        if (filter) {
+            filter.innerHTML = '<option value="">Todas as categorias</option>' + opts;
+        }
+        if (formSel) {
+            formSel.innerHTML = '<option value="">— Selecionar —</option>' + opts;
+        }
+        renderCategoriaChipsBar(document.getElementById('categoriaFilter')?.value || '');
+    } catch (e) {
+        allCategorias = [];
+    }
 }
 
 async function loadProdutos() {
@@ -154,6 +213,7 @@ function renderProdutos(produtos) {
                 </div>
                 <div class="product-info">
                     <h3>${escapeHtml(produto.nome)}</h3>
+                    ${produto.categoria_nome ? `<span class="product-category-badge">${escapeHtml(produto.categoria_nome)}</span>` : ''}
                     <p class="product-description">${escapeHtml(produto.descricao || 'Sem descrição')}</p>
                     ${alergeniosHtml || ''}
                     <div class="product-price">€${parseFloat(produto.preco || 0).toFixed(2)}</div>
@@ -178,11 +238,13 @@ function renderProdutos(produtos) {
 function filterProdutos() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const disponibilidade = document.getElementById('disponibilidadeFilter').value;
+    const categoria = document.getElementById('categoriaFilter').value;
     
     let filtered = allProdutos;
     
     if (search) filtered = filtered.filter(p => p.nome && p.nome.toLowerCase().includes(search));
     if (disponibilidade !== '') filtered = filtered.filter(p => p.disponivel == disponibilidade);
+    if (categoria !== '') filtered = filtered.filter(p => String(p.categoria_id) === String(categoria));
     
     renderProdutos(filtered);
 }
@@ -207,6 +269,7 @@ function openProdutoModal(produto = null) {
         title.textContent = 'Editar Produto';
         document.getElementById('produtoId').value = produto.produto_id;
         document.getElementById('produtoNome').value = produto.nome || '';
+        document.getElementById('produtoCategoria').value = produto.categoria_id || '';
         document.getElementById('produtoDescricao').value = produto.descricao || '';
         document.getElementById('produtoPreco').value = produto.preco || '';
         document.getElementById('produtoDisponivel').value = produto.disponivel || 1;
@@ -246,8 +309,14 @@ async function saveProduto(e) {
     if (!isElevatedPainel()) return;
 
     const produtoId = document.getElementById('produtoId').value;
+    const categoriaId = document.getElementById('produtoCategoria').value;
+    if (!categoriaId) {
+        alert('Selecione uma categoria');
+        return;
+    }
     const formData = {
         nome: document.getElementById('produtoNome').value,
+        categoria_id: categoriaId,
         descricao: document.getElementById('produtoDescricao').value,
         preco: document.getElementById('produtoPreco').value,
         disponivel: document.getElementById('produtoDisponivel').value,
