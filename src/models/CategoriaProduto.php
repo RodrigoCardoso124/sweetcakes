@@ -65,7 +65,9 @@ class CategoriaProduto
     {
         $db->exec(
             'UPDATE produtos p
-             INNER JOIN categorias_produto c ON LOWER(TRIM(p.descricao)) = LOWER(TRIM(c.nome))
+             INNER JOIN categorias_produto c
+                ON LOWER(TRIM(p.descricao)) COLLATE utf8mb4_unicode_ci
+                 = LOWER(TRIM(c.nome)) COLLATE utf8mb4_unicode_ci
              SET p.categoria_id = c.categoria_id
              WHERE p.categoria_id IS NULL'
         );

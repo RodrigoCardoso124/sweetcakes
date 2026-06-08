@@ -242,10 +242,37 @@ async function loadPendentes() {
     .join('');
   ligarAbrirFicheiro(tb);
 
+  focarEncomendaPendente(tb);
+}
+
+function focarEncomendaPendente(tb) {
   const encParam = new URLSearchParams(location.search).get('encomenda_id');
-  if (encParam) {
-    const btn = tb.querySelector('[data-emitir-enc="' + encParam + '"]');
-    if (btn) btn.focus();
+  if (!encParam || !tb) return;
+
+  const btn = tb.querySelector('[data-emitir-enc="' + encParam + '"]');
+  if (btn) {
+    const row = btn.closest('tr');
+    if (row) {
+      row.classList.add('fat-row--focus');
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    btn.focus();
+    if (typeof showToast === 'function') {
+      showToast(
+        'Encomenda #' + encParam + ' entregue — confirma a emissão da fatura.',
+        'info'
+      );
+    }
+    return;
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(
+      'Encomenda #' +
+        encParam +
+        ' não está na lista de pendentes (já faturada ou ainda não elegível).',
+      'warning'
+    );
   }
 }
 

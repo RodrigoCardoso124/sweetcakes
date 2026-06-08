@@ -37,28 +37,31 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- Migrar: o campo descricao tinha o nome da categoria no catálogo importado
+-- COLLATE evita erro 1267 (general_ci vs unicode_ci entre tabelas antigas e novas)
 UPDATE produtos p
-INNER JOIN categorias_produto c ON LOWER(TRIM(p.descricao)) = LOWER(TRIM(c.nome))
+INNER JOIN categorias_produto c
+    ON LOWER(TRIM(p.descricao)) COLLATE utf8mb4_unicode_ci
+     = LOWER(TRIM(c.nome)) COLLATE utf8mb4_unicode_ci
 SET p.categoria_id = c.categoria_id
-WHERE p.categoria_id IS NULL;
+WHERE p.produto_id > 0 AND p.categoria_id IS NULL;
 
--- Semifrios pelo nome (fallback)
+-- Semifrios pelo nome (fallback) — produto_id > 0 = safe updates no Workbench
 UPDATE produtos p
 INNER JOIN categorias_produto c ON c.slug = 'semifrios'
 SET p.categoria_id = c.categoria_id
-WHERE p.categoria_id IS NULL AND LOWER(p.nome) LIKE 'semifrio%';
+WHERE p.produto_id > 0 AND p.categoria_id IS NULL AND LOWER(p.nome) LIKE 'semifrio%';
 
 UPDATE produtos p
 INNER JOIN categorias_produto c ON c.slug = 'tartes'
 SET p.categoria_id = c.categoria_id
-WHERE p.categoria_id IS NULL AND LOWER(p.nome) LIKE 'tarte%';
+WHERE p.produto_id > 0 AND p.categoria_id IS NULL AND LOWER(p.nome) LIKE 'tarte%';
 
 UPDATE produtos p
 INNER JOIN categorias_produto c ON c.slug = 'tortas'
 SET p.categoria_id = c.categoria_id
-WHERE p.categoria_id IS NULL AND LOWER(p.nome) LIKE 'torta%';
+WHERE p.produto_id > 0 AND p.categoria_id IS NULL AND LOWER(p.nome) LIKE 'torta%';
 
 UPDATE produtos p
 INNER JOIN categorias_produto c ON c.slug = 'bolos'
 SET p.categoria_id = c.categoria_id
-WHERE p.categoria_id IS NULL;
+WHERE p.produto_id > 0 AND p.categoria_id IS NULL;

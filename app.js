@@ -439,6 +439,12 @@ async function updateOrderStatus() {
     modal.classList.remove('active');
     loadEncomendas();
 
+    if (newStatus === 'entregue') {
+      window.location.href =
+        'faturacao.html?encomenda_id=' + encodeURIComponent(encomendaId);
+      return;
+    }
+
     if (typeof showToastsForEncomendaEmail === 'function') {
       showToastsForEncomendaEmail(response, encomendaId, response && response.estado_novo);
     } else if (typeof showToast === 'function') {

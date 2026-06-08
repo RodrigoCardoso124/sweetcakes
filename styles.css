@@ -2048,6 +2048,12 @@ textarea:focus {
     display: block;
 }
 
+tr.fat-row--focus {
+    background: rgba(184, 147, 95, 0.14);
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+}
+
 @keyframes fatPanelIn {
     from {
         opacity: 0;

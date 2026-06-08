@@ -349,6 +349,13 @@ async function updateStatus() {
     };
 
     const response = await API.updateEncomenda(currentEncomendaId, updateData);
+
+    if (newStatus === 'entregue') {
+      window.location.href =
+        'faturacao.html?encomenda_id=' + encodeURIComponent(currentEncomendaId);
+      return;
+    }
+
     await loadEncomendaDetails();
     if (typeof showToastsForEncomendaEmail === 'function') {
       showToastsForEncomendaEmail(response, currentEncomendaId, response && response.estado_novo);
